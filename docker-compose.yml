@@ -1,0 +1,13 @@
+services:
+  ubersdr_navtex:
+    image: madpsy/ubersdr_navtex:latest
+    restart: unless-stopped
+    ports:
+      - "6092:6092"
+    environment:
+      # UberSDR base URL
+      UBERSDR_URL: "http://172.20.0.1:8080"
+      # NAVTEX carrier frequency in Hz (518000 = international, 490000 = UK/coastal)
+      NAVTEX_FREQ: "518000"
+      # Uncomment and set as needed:
+      # WEB_PORT: "6092"
