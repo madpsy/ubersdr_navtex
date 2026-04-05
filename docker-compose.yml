@@ -1,5 +1,6 @@
 services:
   ubersdr_navtex:
+    container_name: navtex
     image: madpsy/ubersdr_navtex:latest
     restart: unless-stopped
     ports:
@@ -11,3 +12,10 @@ services:
       NAVTEX_FREQ: "518000"
       # Uncomment and set as needed:
       # WEB_PORT: "6092"
+    networks:
+      - sdr-network
+
+networks:
+  sdr-network:
+    external: true
+    name: ubersdr_sdr-network

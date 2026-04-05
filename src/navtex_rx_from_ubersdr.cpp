@@ -605,8 +605,17 @@ static FILE *make_broadcast_file()
 /* ------------------------------------------------------------------ */
 /* Embedded HTML page                                                   */
 /* ------------------------------------------------------------------ */
+/* Strip trailing slashes from a path prefix */
+static std::string strip_trailing_slash(const std::string &s)
+{
+    std::string r = s;
+    while (!r.empty() && r.back() == '/') r.pop_back();
+    return r;
+}
+
 static std::string make_html_page(const std::string &sdr_url,
-                                  long carrier_hz)
+                                  long carrier_hz,
+                                  const std::string &base_path = "")
 {
     double freq_khz = carrier_hz / 1000.0;
     char freq_str[32];
@@ -992,9 +1001,11 @@ static std::string make_html_page(const std::string &sdr_url,
         "    }\n"
         "  }\n"
         "\n"
+        "  const BASE_PATH = (typeof window._BASE_PATH === 'string') ? window._BASE_PATH : '';\n"
+        "\n"
         "  function connect() {\n"
         "    const proto = location.protocol === 'https:' ? 'wss' : 'ws';\n"
-        "    const ws = new WebSocket(proto + '://' + location.host + '/ws');\n"
+        "    const ws = new WebSocket(proto + '://' + location.host + BASE_PATH + '/ws');\n"
         "\n"
         "    ws.onopen = function() {\n"
         "      dot.className = 'connected';\n"
@@ -1125,6 +1136,14 @@ static std::string make_html_page(const std::string &sdr_url,
         "</script>\n"
         "</body>\n"
         "</html>\n";
+
+    /* Inject window._BASE_PATH before the closing </head> tag */
+    const std::string inject =
+        "<script>window._BASE_PATH = \"" + base_path + "\";</script>\n";
+    const std::string head_close = "</head>";
+    auto pos = html.find(head_close);
+    if (pos != std::string::npos)
+        html.insert(pos, inject);
 
     return html;
 }
@@ -1264,8 +1283,6 @@ int main(int argc, const char **argv)
     BroadcastHub hub;
     g_hub = &hub;
 
-    std::string html_page = make_html_page(base_url, carrier_hz);
-
     /*
      * ix::HttpServer handles both plain HTTP (serves the HTML page) and
      * WebSocket upgrades (browser clients connecting to /ws).
@@ -1274,17 +1291,29 @@ int main(int argc, const char **argv)
      */
     ix::HttpServer web_server(web_port, "0.0.0.0");
 
-    /* HTTP handler: serve the HTML page for any GET request */
+    /* HTTP handler: serve the HTML page for any GET request.
+     * Reads X-Forwarded-Prefix to support reverse-proxy sub-path deployments. */
     web_server.setOnConnectionCallback(
-        [&html_page](ix::HttpRequestPtr req,
+        [&base_url, &carrier_hz](ix::HttpRequestPtr req,
                      std::shared_ptr<ix::ConnectionState> /*state*/)
         -> ix::HttpResponsePtr
         {
+            /* Extract X-Forwarded-Prefix header (case-insensitive search) */
+            std::string base_path;
+            for (const auto &h : req->headers) {
+                std::string key = h.first;
+                /* lowercase comparison */
+                for (auto &c : key) c = (char)tolower((unsigned char)c);
+                if (key == "x-forwarded-prefix") {
+                    base_path = strip_trailing_slash(h.second);
+                    break;
+                }
+            }
             auto resp = std::make_shared<ix::HttpResponse>();
             resp->statusCode = 200;
             resp->description = "OK";
             resp->headers["Content-Type"] = "text/html; charset=utf-8";
-            resp->body = html_page;
+            resp->body = make_html_page(base_url, carrier_hz, base_path);
             return resp;
         });
 
