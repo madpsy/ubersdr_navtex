@@ -85,7 +85,7 @@ run_image() {
 # Environment variable reference (for docker run -e ...)
 # ---------------------------------------------------------------------------
 #
-#   UBERSDR_URL   UberSDR base URL (default: http://172.20.0.1:8080)
+#   UBERSDR_URL   UberSDR base URL (default: http://ubersdr:8080)
 #   NAVTEX_FREQ   NAVTEX carrier frequency in Hz (default: 518000)
 #   WEB_PORT      Web UI port (default: 6092)
 

@@ -38,7 +38,7 @@ All configuration is via environment variables in `docker-compose.yml`:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `UBERSDR_URL` | `http://172.20.0.1:8080` | UberSDR base URL |
+| `UBERSDR_URL` | `http://ubersdr:8080` | UberSDR base URL |
 | `NAVTEX_FREQ` | `518000` | NAVTEX carrier frequency in Hz (`518000` = international, `490000` = UK/coastal) |
 | `WEB_PORT` | `6092` | Web UI port |
 
