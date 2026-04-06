@@ -78,7 +78,6 @@ docker compose up -d --remove-orphans --force-recreate
 
 echo ""
 echo "Done. ubersdr_navtex is running."
-echo "  Web UI     : http://ubersdr.local:6092"
 echo "  View logs  : docker compose logs -f  (or ./update.sh)"
 echo "  Stop       : ./stop.sh"
 echo "  Start      : ./start.sh"
