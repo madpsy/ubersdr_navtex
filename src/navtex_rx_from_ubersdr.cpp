@@ -330,6 +330,12 @@ struct MsgParser {
         if (is_nnnn && in_msg) {
             complete = true;
             in_msg   = false;
+            /* The first three N's were already appended to body before the
+             * window completed — strip them. */
+            if (body.size() >= 3)
+                body.resize(body.size() - 3);
+            else
+                body.clear();
             return;
         }
         if (in_msg) {
