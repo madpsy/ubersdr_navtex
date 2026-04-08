@@ -585,23 +585,6 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
     I:'Omega', J:'Satnav', K:'Other Nav', L:'Nav Warning (LORAN)',
     T:'Test', X:'Special', Z:'No msg'
   };
-  /* ITU NAVTEX station codes (518 kHz international + 490 kHz national common) */
-  const NAVTEX_STATION = {
-    A:'Svalbard (LGN)',      B:'Vardø (LGN)',          C:'Bjørnøya (LGN)',
-    D:'Rogaland (LGN)',      E:'Malin Head (EJM)',      F:'Niton (GNI)',
-    G:'Cullercoats (GCC)',   H:'Portpatrick (GPK)',     I:'Reykjavik (TFA)',
-    J:'Valentia (EJK)',      K:'Corsen (FFU)',           L:'La Garde (FFM)',
-    M:'Monsanto (CUL)',      N:'Tarifa (EAT)',           O:'Coruña (EAC)',
-    P:'Horta (CUH)',         Q:'Monsanto (CUL)',         R:'Cullercoats (GCC)',
-    S:'Niton (GNI)',         T:'Malin Head (EJM)',       U:'Valentia (EJK)',
-    V:'Portpatrick (GPK)',   W:'Rogaland (LGN)',         X:'Vardø (LGN)',
-    Y:'Bjørnøya (LGN)',      Z:'Svalbard (LGN)',
-    /* 490 kHz national / additional */
-    '0':'Oostende (OST)',    '1':'Niton (GNI)',          '2':'Cullercoats (GCC)',
-    '3':'Portpatrick (GPK)', '4':'Malin Head (EJM)',     '5':'Valentia (EJK)',
-    '6':'Corsen (FFU)',      '7':'La Garde (FFM)',        '8':'Monsanto (CUL)',
-    '9':'Tarifa (EAT)'
-  };
   function decodeNavtexId(id) {
     /* id is like "EA42", "BZ", "unknown" */
     if (!id || id === 'unknown') return { station: '—', subject: '—', serial: '—' };
@@ -610,7 +593,7 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
     const subCode = s.length >= 2 ? s[1] : '';
     const serial  = s.length >= 3 ? s.slice(2) : '—';
     return {
-      station: NAVTEX_STATION[stCode] || (stCode ? stCode : '—'),
+      station: stCode ? stCode : '—',
       subject: SUBJECT[subCode]        || (subCode ? subCode : '—'),
       serial:  serial
     };
