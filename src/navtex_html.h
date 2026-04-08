@@ -17,7 +17,7 @@ static std::string make_html_page(const std::string &sdr_url,
                                   const std::vector<ChannelContext> &channels,
                                   const std::string &base_path = "")
 {
-    /* ---- Tab buttons ---- */
+    /* ---- Tab buttons (individual channels) ---- */
     std::string tab_buttons;
     for (size_t i = 0; i < channels.size(); i++) {
         char btn[512];
@@ -31,6 +31,10 @@ static std::string make_html_page(const std::string &sdr_url,
             channels[i].name.c_str());
         tab_buttons += btn;
     }
+    /* "Both" tab — pushed to far right via margin-left:auto */
+    tab_buttons +=
+        "    <button class=\"tab-btn tab-btn-both\" id=\"tab-btn-both\" onclick=\"switchTab('both')\">"
+        "&#x25A6; <span class=\"tab-name\">Both</span></button>\n";
 
     /* ---- Per-channel panels ---- */
     std::string panels;
@@ -83,6 +87,11 @@ static std::string make_html_page(const std::string &sdr_url,
                    "<span class=\"stat-value\" id=\"msg-subject-" + s + "\">&mdash;</span></div>\n"
             "      <div class=\"stat\"><span class=\"stat-label\">Serial</span>"
                    "<span class=\"stat-value\" id=\"msg-serial-" + s + "\">&mdash;</span></div>\n"
+            "      <div class=\"output-actions\" style=\"margin-left:auto;display:flex;gap:5px;align-items:center\">\n"
+            "        <button class=\"icon-btn\" title=\"Clear output\" onclick=\"clearOutput(" + s + ")\" aria-label=\"Clear\">&#x1F5D1;</button>\n"
+            "        <button class=\"icon-btn\" title=\"Copy to clipboard\" onclick=\"copyOutput(" + s + ")\" aria-label=\"Copy\">&#x1F4CB;</button>\n"
+            "        <button class=\"icon-btn\" title=\"Download as text file\" onclick=\"downloadOutput(" + s + ")\" aria-label=\"Download\">&#x2B07;</button>\n"
+            "      </div>\n"
             "    </div>\n"
             "    <div class=\"output\" id=\"output-" + s + "\"><span class=\"dim\">Waiting for signal&hellip;</span></div>\n"
             "  </div>\n";
@@ -135,7 +144,15 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
   display: flex;
   gap: 4px;
   flex-shrink: 0;
+  align-items: flex-end;
 }
+.tab-btn-both {
+  margin-left: auto;  /* push to far right */
+  border-color: #2a4a6a;
+  color: #7ab8d8;
+}
+.tab-btn-both:hover { color: #53d8fb; }
+.tab-btn-both.active { color: #53d8fb; }
 .tab-btn {
   background: #16213e;
   border: 1px solid #0f3460;
@@ -272,6 +289,79 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
   min-height: 0;
 }
 .output .dim { color: #555; }
+
+/* ---- Split (Both) panel ---- */
+#panel-both {
+  flex-direction: row !important;
+  gap: 6px;
+}
+.split-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.split-col-header {
+  background: #16213e;
+  border: 1px solid #0f3460;
+  border-bottom: none;
+  border-radius: 6px 6px 0 0;
+  padding: 5px 12px;
+  font-size: 0.78rem;
+  color: #53d8fb;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.split-col-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #0f3460;
+  border-radius: 0 0 6px 6px;
+  overflow: hidden;
+  min-height: 0;
+}
+/* Inside split columns, stats/msg/output inherit normal styles */
+.split-col-body .stats-bar  { border-radius: 0; border-left: none; border-right: none; border-top: none; }
+.split-col-body .msg-bar    { border-radius: 0; border-left: none; border-right: none; border-top: none; }
+.split-col-body .output     { border-radius: 0; }
+
+/* ---- Timestamp label in output ---- */
+.ts-stamp {
+  color: #4a6a8a;
+  font-size: 0.78rem;
+  margin-right: 6px;
+  user-select: none;
+  flex-shrink: 0;
+}
+.output-line {
+  display: flex;
+  align-items: baseline;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+/* ---- Output action icon buttons ---- */
+.icon-btn {
+  background: transparent;
+  border: 1px solid #0f3460;
+  border-radius: 4px;
+  color: #555;
+  cursor: pointer;
+  font-size: 0.95rem;
+  line-height: 1;
+  padding: 3px 6px;
+  transition: color 0.2s, border-color 0.2s, background 0.2s;
+}
+.icon-btn:hover {
+  background: #16213e;
+  border-color: #53d8fb;
+  color: #53d8fb;
+}
 </style>
 </head>
 <body>
@@ -285,11 +375,18 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
     <span class="info-label">Status</span>
     <span class="info-value"><span id="status-dot"></span><span id="status-text">Connecting&hellip;</span></span>
   </div>
+  <label class="ts-label" style="margin-left:auto;display:flex;align-items:center;gap:6px;cursor:pointer;font-size:0.78rem;color:#888;user-select:none">
+    <input type="checkbox" id="ts-toggle" checked style="accent-color:#53d8fb;width:14px;height:14px;cursor:pointer">
+    Timestamps
+  </label>
 </header>
 <div class="tab-bar">
 )HTML" + tab_buttons + R"HTML(</div>
 <div class="tab-content">
-)HTML" + panels + R"HTML(</div>
+)HTML" + panels + R"HTML(
+  <div class="tab-panel" id="panel-both" style="display:none">
+  </div>
+</div>
 <script>
   const SUBJECT = {
     A:'Nav Warning', B:'Met Warning', C:'Ice', D:'SAR',
@@ -308,19 +405,185 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
 
   /* ---- Tab switching ---- */
   let activeTab = 0;
+  let splitBuilt = false;
+
+  function buildSplitPanel() {
+    if (splitBuilt) return;
+    splitBuilt = true;
+    const both = document.getElementById('panel-both');
+    for (let i = 0; i < NUM_CHANNELS; i++) {
+      const srcPanel = document.getElementById('panel-' + i);
+      /* Build a column wrapper */
+      const col = document.createElement('div');
+      col.className = 'split-col';
+      col.id = 'split-col-' + i;
+
+      /* Column header showing frequency label */
+      const hdr = document.createElement('div');
+      hdr.className = 'split-col-header';
+      hdr.innerHTML = '<span class="tab-dot" id="split-dot-' + i + '"></span>'
+                    + srcPanel.querySelector('.stats-bar') ? '' : '';
+      /* Get label from the tab button text */
+      const tabBtn = document.getElementById('tab-btn-' + i);
+      hdr.innerHTML = '<span class="tab-dot" id="split-dot-' + i + '"></span>'
+                    + (tabBtn ? tabBtn.innerText.trim() : 'Channel ' + i);
+      col.appendChild(hdr);
+
+      /* Column body: clone the stats-bar, msg-bar, output from the real panel */
+      const body = document.createElement('div');
+      body.className = 'split-col-body';
+      body.id = 'split-body-' + i;
+
+      /* Clone stats-bar */
+      const statsBar = srcPanel.querySelector('.stats-bar');
+      if (statsBar) {
+        const clone = statsBar.cloneNode(true);
+        /* Suffix all IDs in the clone with -s (split) */
+        clone.querySelectorAll('[id]').forEach(function(el) {
+          el.id = el.id + '-s';
+        });
+        clone.id = 'split-stats-' + i;
+        body.appendChild(clone);
+      }
+
+      /* Clone msg-bar */
+      const msgBar = srcPanel.querySelector('.msg-bar');
+      if (msgBar) {
+        const clone = msgBar.cloneNode(true);
+        clone.querySelectorAll('[id]').forEach(function(el) {
+          el.id = el.id + '-s';
+        });
+        clone.id = 'split-msg-' + i;
+        body.appendChild(clone);
+      }
+
+      /* Clone output */
+      const output = srcPanel.querySelector('.output');
+      if (output) {
+        const clone = output.cloneNode(true);
+        clone.id = 'split-output-' + i;
+        body.appendChild(clone);
+      }
+
+      col.appendChild(body);
+      both.appendChild(col);
+    }
+
+    /* MutationObserver: keep split output areas in sync with real output areas */
+    for (let i = 0; i < NUM_CHANNELS; i++) {
+      (function(ch) {
+        const src  = document.getElementById('output-' + ch);
+        const dest = document.getElementById('split-output-' + ch);
+        if (!src || !dest) return;
+        const obs = new MutationObserver(function() {
+          dest.innerHTML = src.innerHTML;
+          dest.scrollTop = dest.scrollHeight;
+        });
+        obs.observe(src, { childList: true, subtree: true, characterData: true });
+      })(i);
+    }
+  }
+
+  function syncSplitStats(ch) {
+    /* Copy text content of every stat-value from real panel to split clone */
+    const suffixes = ['bb-val','nd-val','rate-val','dec-state','fec-val','err-val',
+                      'act-text','snr-val','sig-fill','snr-fill',
+                      'fec-clean','fec-fec','fec-fail',
+                      'msg-dot','msg-status','msg-station','msg-subject','msg-serial'];
+    suffixes.forEach(function(name) {
+      const src  = document.getElementById(name + '-' + ch);
+      const dest = document.getElementById(name + '-' + ch + '-s');
+      if (!src || !dest) return;
+      dest.textContent = src.textContent;
+      dest.className   = src.className;
+      if (src.style && src.style.width !== undefined) dest.style.width = src.style.width;
+      if (src.style && src.style.background !== undefined) dest.style.background = src.style.background;
+    });
+    /* Sync tab-dot -> split-dot */
+    const tabDot   = document.getElementById('tab-dot-' + ch);
+    const splitDot = document.getElementById('split-dot-' + ch);
+    if (tabDot && splitDot) splitDot.className = tabDot.className;
+  }
+
   function switchTab(ch) {
+    /* Hide all individual panels and deactivate all buttons */
     for (let i = 0; i < NUM_CHANNELS; i++) {
       const btn   = document.getElementById('tab-btn-' + i);
       const panel = document.getElementById('panel-' + i);
-      if (i === ch) {
-        btn.classList.add('active');
-        panel.style.display = 'flex';
-      } else {
-        btn.classList.remove('active');
-        panel.style.display = 'none';
-      }
+      if (btn)   btn.classList.remove('active');
+      if (panel) panel.style.display = 'none';
+    }
+    const bothBtn   = document.getElementById('tab-btn-both');
+    const bothPanel = document.getElementById('panel-both');
+    if (bothBtn)   bothBtn.classList.remove('active');
+    if (bothPanel) bothPanel.style.display = 'none';
+
+    if (ch === 'both') {
+      buildSplitPanel();
+      /* Sync current state into split clones */
+      for (let i = 0; i < NUM_CHANNELS; i++) syncSplitStats(i);
+      if (bothBtn)   bothBtn.classList.add('active');
+      if (bothPanel) bothPanel.style.display = 'flex';
+    } else {
+      const btn   = document.getElementById('tab-btn-' + ch);
+      const panel = document.getElementById('panel-' + ch);
+      if (btn)   btn.classList.add('active');
+      if (panel) panel.style.display = 'flex';
     }
     activeTab = ch;
+  }
+
+  /* After stats/msg updates, also refresh split clones if Both tab is active */
+  function maybeSyncSplit(ch) {
+    if (activeTab === 'both' && splitBuilt) syncSplitStats(ch);
+  }
+
+  /* ---- Output actions: clear / copy / download ---- */
+  function clearOutput(ch) {
+    const out = document.getElementById('output-' + ch);
+    if (!out) return;
+    out.innerHTML = '<span class="dim">Cleared.</span>';
+    firstChar[ch] = false;
+    lineStart[ch] = true;
+  }
+
+  function copyOutput(ch) {
+    const out = document.getElementById('output-' + ch);
+    if (!out) return;
+    const text = out.innerText || out.textContent || '';
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).catch(function() {
+        fallbackCopy(text);
+      });
+    } else {
+      fallbackCopy(text);
+    }
+  }
+
+  function fallbackCopy(text) {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); } catch(e) {}
+    document.body.removeChild(ta);
+  }
+
+  function downloadOutput(ch) {
+    const out = document.getElementById('output-' + ch);
+    if (!out) return;
+    const text = out.innerText || out.textContent || '';
+    const blob = new Blob([text], { type: 'text/plain' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = 'navtex-ch' + ch + '-' + new Date().toISOString().slice(0,19).replace(/:/g,'-') + '.txt';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   }
 
   /* ---- DOM element helpers ---- */
@@ -406,6 +669,7 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
       fecFec.style.width   = '0%';
       fecFail.style.width  = '0%';
     }
+    maybeSyncSplit(ch);
   }
 
   /* ---- Message info update ---- */
@@ -435,6 +699,7 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
       subject.textContent = '\u2014';
       serial.textContent  = '\u2014';
     }
+    maybeSyncSplit(ch);
   }
 
   /* ---- Audio preview ---- */
@@ -583,13 +848,74 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
         const ch  = parseInt(e.data[0], 10);
         const chr = e.data.slice(1);
         if (ch >= 0 && ch < NUM_CHANNELS) {
-          const out = chEl('output', ch);
-          if (firstChar[ch]) { out.innerHTML = ''; firstChar[ch] = false; }
-          out.appendChild(document.createTextNode(chr));
-          out.scrollTop = out.scrollHeight;
+          appendChar(ch, chr);
         }
       }
     };
+  }
+
+  /* ---- Timestamp-aware character appender ---- */
+  /*
+   * Per-channel state: track whether we are at the start of a new line
+   * so we can prepend a UTC timestamp when timestamps are enabled.
+   * A "new line" starts after \r or \n, or at the very first character.
+   */
+  const lineStart = Array(NUM_CHANNELS).fill(true);
+
+  function utcStamp() {
+    const d = new Date();
+    return d.toISOString().slice(11, 19) + 'Z'; /* HH:MM:SSZ */
+  }
+
+  function appendChar(ch, chr) {
+    const out = chEl('output', ch);
+    if (!out) return;
+
+    /* Clear placeholder on first real character */
+    if (firstChar[ch]) { out.innerHTML = ''; firstChar[ch] = false; }
+
+    const tsEnabled = document.getElementById('ts-toggle') && document.getElementById('ts-toggle').checked;
+
+    /* If we're at the start of a line and timestamps are on, create a new line div */
+    if (lineStart[ch] && tsEnabled) {
+      const lineDiv = document.createElement('div');
+      lineDiv.className = 'output-line';
+
+      const stamp = document.createElement('span');
+      stamp.className = 'ts-stamp';
+      stamp.textContent = utcStamp();
+      lineDiv.appendChild(stamp);
+
+      const text = document.createElement('span');
+      text.className = 'output-text';
+      lineDiv.appendChild(text);
+
+      out.appendChild(lineDiv);
+      lineStart[ch] = false;
+    }
+
+    /* Append the character to the current line */
+    if (tsEnabled) {
+      /* Find the last .output-text span in the output */
+      const spans = out.querySelectorAll('.output-text');
+      const target = spans.length > 0 ? spans[spans.length - 1] : null;
+      if (target) {
+        target.textContent += chr;
+      } else {
+        /* Fallback: no line div yet (shouldn't happen) */
+        out.appendChild(document.createTextNode(chr));
+      }
+    } else {
+      /* Timestamps off: plain text node, same as before */
+      out.appendChild(document.createTextNode(chr));
+    }
+
+    /* Track line boundaries */
+    if (chr === '\n' || chr === '\r') {
+      lineStart[ch] = true;
+    }
+
+    out.scrollTop = out.scrollHeight;
   }
 
   connect();
