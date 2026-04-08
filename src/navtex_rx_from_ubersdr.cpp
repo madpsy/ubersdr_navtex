@@ -1382,6 +1382,12 @@ int main(int argc, const char **argv)
         fprintf(stderr, "error: fopencookie failed\n");
         return EXIT_FAILURE;
     }
+    /* fopencookie() returns a fully-buffered FILE* by default.
+     * Without this, putc() in put_rx_char() fills the stdio buffer silently
+     * and ws_cookie_write() is never called until the buffer fills (~4096 bytes),
+     * which never happens for a typical NAVTEX message. Make it unbuffered so
+     * every decoded character is broadcast to WebSocket clients immediately. */
+    setvbuf(broadcast_file, nullptr, _IONBF, 0);
 
     navtex_rx nv(sample_rate, only_sitor_b, reverse, broadcast_file);
 
