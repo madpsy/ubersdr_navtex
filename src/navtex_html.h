@@ -276,6 +276,40 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
 .msg-dot.receiving { background: #ffeb3b; box-shadow: 0 0 5px #ffeb3b; }
 .msg-dot.complete  { background: #4caf50; box-shadow: 0 0 5px #4caf50; }
 
+/* ---- Message start/end dividers in output ---- */
+.msg-divider {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0 2px;
+  font-size: 0.7rem;
+  font-family: monospace;
+  user-select: none;
+  pointer-events: none;
+}
+.msg-divider::before,
+.msg-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+}
+.msg-divider.msg-start {
+  color: #53d8fb;
+}
+.msg-divider.msg-start::before,
+.msg-divider.msg-start::after {
+  background: #1a4a6a;
+}
+.msg-divider.msg-end {
+  color: #4caf50;
+  margin-top: 2px;
+  margin-bottom: 6px;
+}
+.msg-divider.msg-end::before,
+.msg-divider.msg-end::after {
+  background: #1a4a2a;
+}
+
 /* ---- Output area ---- */
 .output {
   flex: 1;
@@ -586,14 +620,13 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
     const out = document.getElementById('output-' + ch);
     if (!out) return;
     out.innerHTML = '<span class="dim">Cleared.</span>';
-    firstChar[ch] = false;
+    firstChar[ch] = true;
     lineStart[ch] = true;
+    rawLines[ch] = [];
   }
 
   function copyOutput(ch) {
-    const out = document.getElementById('output-' + ch);
-    if (!out) return;
-    const text = out.innerText || out.textContent || '';
+    const text = getOutputText(ch);
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(text).catch(function() {
         fallbackCopy(text);
@@ -615,9 +648,7 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
   }
 
   function downloadOutput(ch) {
-    const out = document.getElementById('output-' + ch);
-    if (!out) return;
-    const text = out.innerText || out.textContent || '';
+    const text = getOutputText(ch);
     const blob = new Blob([text], { type: 'text/plain' });
     const url  = URL.createObjectURL(blob);
     const a    = document.createElement('a');
@@ -733,6 +764,20 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
 
   /* ---- Message info update ---- */
   function updateMsgInfo(ch, inMsg, done, sta, sub, ser) {
+    const prev = prevMsgState[ch];
+
+    /* Detect message start: transition to inMsg=true */
+    if (inMsg && !prev.inMsg && !prev.done) {
+      insertDivider(ch, 'start');
+    }
+    /* Detect message end: transition to done=true */
+    if (done && !prev.done) {
+      insertDivider(ch, 'end');
+    }
+
+    /* Update previous state */
+    prevMsgState[ch] = { inMsg: inMsg, done: done };
+
     const msgBar  = chEl('msg-bar',    ch);
     const dot     = chEl('msg-dot',    ch);
     const statTxt = chEl('msg-status', ch);
@@ -940,60 +985,160 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
    */
   const lineStart = Array(NUM_CHANNELS).fill(true);
 
+  /* Per-channel array of entries for completed lines + current partial.
+   * Each entry is one of:
+   *   {stamp:'HH:MM:SSZ', text:'...'}          — a text line
+   *   {divider: true, kind: 'start'|'end'}      — a message boundary marker
+   */
+  const rawLines = [];
+  for (let i = 0; i < NUM_CHANNELS; i++) rawLines.push([]);
+
+  /* Previous msg state per channel — used to detect start/end transitions */
+  const prevMsgState = [];
+  for (let i = 0; i < NUM_CHANNELS; i++) prevMsgState.push({ inMsg: false, done: false });
+
   function utcStamp() {
     const d = new Date();
     return d.toISOString().slice(11, 19) + 'Z'; /* HH:MM:SSZ */
   }
+
+  /* Insert a divider element into the output area and record it in rawLines */
+  function insertDivider(ch, kind) {
+    rawLines[ch].push({ divider: true, kind: kind });
+    const out = chEl('output', ch);
+    if (!out) return;
+    const d = document.createElement('div');
+    d.className = 'msg-divider msg-' + kind;
+    d.textContent = kind === 'start' ? 'Message Start' : 'Message End';
+    out.appendChild(d);
+    out.scrollTop = out.scrollHeight;
+  }
+
+  /* Re-render the output area for channel ch from rawLines */
+  function reRenderOutput(ch) {
+    const out = chEl('output', ch);
+    if (!out) return;
+    const tsEnabled = document.getElementById('ts-toggle') && document.getElementById('ts-toggle').checked;
+    out.innerHTML = '';
+    const lines = rawLines[ch];
+    if (lines.length === 0) return;
+    for (let i = 0; i < lines.length; i++) {
+      const entry = lines[i];
+      if (entry.divider) {
+        const d = document.createElement('div');
+        d.className = 'msg-divider msg-' + entry.kind;
+        d.textContent = entry.kind === 'start' ? 'Message Start' : 'Message End';
+        out.appendChild(d);
+      } else if (tsEnabled) {
+        const lineDiv = document.createElement('div');
+        lineDiv.className = 'output-line';
+        const stamp = document.createElement('span');
+        stamp.className = 'ts-stamp';
+        stamp.textContent = entry.stamp + ' ';
+        lineDiv.appendChild(stamp);
+        const text = document.createElement('span');
+        text.className = 'output-text';
+        text.textContent = entry.text;
+        lineDiv.appendChild(text);
+        out.appendChild(lineDiv);
+      } else {
+        /* Plain text: text + newline (except last partial line) */
+        const isLast = (i === lines.length - 1);
+        out.appendChild(document.createTextNode(entry.text + (isLast ? '' : '\n')));
+      }
+    }
+    out.scrollTop = out.scrollHeight;
+  }
+
+  /* Wire the timestamp toggle to re-render all channels */
+  (function() {
+    const tog = document.getElementById('ts-toggle');
+    if (tog) tog.addEventListener('change', function() {
+      for (let i = 0; i < NUM_CHANNELS; i++) reRenderOutput(i);
+    });
+  })();
 
   function appendChar(ch, chr) {
     const out = chEl('output', ch);
     if (!out) return;
 
     /* Clear placeholder on first real character */
-    if (firstChar[ch]) { out.innerHTML = ''; firstChar[ch] = false; }
+    if (firstChar[ch]) {
+      out.innerHTML = '';
+      firstChar[ch] = false;
+      rawLines[ch] = [{ stamp: utcStamp(), text: '' }];
+    }
+
+    /* Ensure at least one line entry exists */
+    if (rawLines[ch].length === 0) {
+      rawLines[ch].push({ stamp: utcStamp(), text: '' });
+    }
 
     const tsEnabled = document.getElementById('ts-toggle') && document.getElementById('ts-toggle').checked;
 
-    /* If we're at the start of a line and timestamps are on, create a new line div */
-    if (lineStart[ch] && tsEnabled) {
-      const lineDiv = document.createElement('div');
-      lineDiv.className = 'output-line';
-
-      const stamp = document.createElement('span');
-      stamp.className = 'ts-stamp';
-      stamp.textContent = utcStamp();
-      lineDiv.appendChild(stamp);
-
-      const text = document.createElement('span');
-      text.className = 'output-text';
-      lineDiv.appendChild(text);
-
-      out.appendChild(lineDiv);
+    if (chr === '\n' || chr === '\r') {
+      /* Append newline to current last line's text, then start a new line entry */
+      rawLines[ch][rawLines[ch].length - 1].text += chr;
+      rawLines[ch].push({ stamp: utcStamp(), text: '' });
+      lineStart[ch] = true;
+    } else {
+      /* Append character to current last line */
+      rawLines[ch][rawLines[ch].length - 1].text += chr;
       lineStart[ch] = false;
     }
 
-    /* Append the character to the current line */
+    /* Render the new character into the DOM */
     if (tsEnabled) {
-      /* Find the last .output-text span in the output */
-      const spans = out.querySelectorAll('.output-text');
-      const target = spans.length > 0 ? spans[spans.length - 1] : null;
-      if (target) {
-        target.textContent += chr;
+      if (chr === '\n' || chr === '\r') {
+        /* Start a new .output-line div for the next line */
+        const lineDiv = document.createElement('div');
+        lineDiv.className = 'output-line';
+        const stamp = document.createElement('span');
+        stamp.className = 'ts-stamp';
+        stamp.textContent = rawLines[ch][rawLines[ch].length - 1].stamp + ' ';
+        lineDiv.appendChild(stamp);
+        const text = document.createElement('span');
+        text.className = 'output-text';
+        lineDiv.appendChild(text);
+        out.appendChild(lineDiv);
       } else {
-        /* Fallback: no line div yet (shouldn't happen) */
-        out.appendChild(document.createTextNode(chr));
+        /* Find or create the last .output-line div */
+        let lineDiv = out.querySelector('.output-line:last-child');
+        if (!lineDiv) {
+          lineDiv = document.createElement('div');
+          lineDiv.className = 'output-line';
+          const stamp = document.createElement('span');
+          stamp.className = 'ts-stamp';
+          stamp.textContent = rawLines[ch][rawLines[ch].length - 1].stamp + ' ';
+          lineDiv.appendChild(stamp);
+          const text = document.createElement('span');
+          text.className = 'output-text';
+          lineDiv.appendChild(text);
+          out.appendChild(lineDiv);
+        }
+        const textSpan = lineDiv.querySelector('.output-text');
+        if (textSpan) textSpan.textContent += chr;
       }
     } else {
-      /* Timestamps off: plain text node, same as before */
+      /* Timestamps off: plain text node */
       out.appendChild(document.createTextNode(chr));
     }
 
-    /* Track line boundaries */
-    if (chr === '\n' || chr === '\r') {
-      lineStart[ch] = true;
-    }
-
     out.scrollTop = out.scrollHeight;
+  }
+
+  /* Extract plain text from output for copy/download — strips timestamps and dividers */
+  function getOutputText(ch) {
+    const lines = rawLines[ch];
+    if (!lines || lines.length === 0) {
+      /* Fallback: read from DOM */
+      const out = chEl('output', ch);
+      return out ? (out.innerText || out.textContent || '') : '';
+    }
+    return lines
+      .filter(function(e) { return !e.divider; })
+      .map(function(e) { return e.text; })
+      .join('');
   }
 
   connect();
