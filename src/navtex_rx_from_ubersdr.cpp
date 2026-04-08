@@ -1245,18 +1245,16 @@ static std::string history_list_json(const std::string &log_dir)
         if (!first) json += ",";
         first = false;
         json += "{";
-        json += "\"type\":\""   + std::string(fe.is_raw ? "raw" : "msg") + "\"";
-        json += ",\"path\":\"" + json_escape(fe.full)  + "\"";
-        json += ",\"rel\":\""  + json_escape(rel)       + "\"";
-        json += ",\"freq\":\""  + json_escape(freq)      + "\"";
-        json += ",\"date\":\""  + json_escape(year + "-" + month + "-" + day) + "\"";
+        json += "\"type\":\""  + std::string(fe.is_raw ? "raw" : "msg") + "\"";
+        json += ",\"rel\":\""  + json_escape(rel)  + "\"";
+        json += ",\"freq\":\"" + json_escape(freq) + "\"";
+        json += ",\"date\":\"" + json_escape(year + "-" + month + "-" + day) + "\"";
         if (!fe.is_raw) {
-            json += ",\"time\":\""        + json_escape(time_part)   + "\"";
-            json += ",\"id\":\""          + json_escape(id_part)     + "\"";
-            json += ",\"serial\":\""      + json_escape(serial_part) + "\"";
-            json += ",\"has_metrics\":"   + std::string(has_metrics ? "true" : "false");
+            json += ",\"time\":\""      + json_escape(time_part)   + "\"";
+            json += ",\"id\":\""        + json_escape(id_part)     + "\"";
+            json += ",\"serial\":\""    + json_escape(serial_part) + "\"";
+            json += ",\"has_metrics\":" + std::string(has_metrics ? "true" : "false");
             if (has_metrics) {
-                json += ",\"metrics_path\":\"" + json_escape(json_sidecar_path) + "\"";
                 if (!inline_snr.empty())
                     json += ",\"snr\":" + inline_snr;
                 if (!inline_duration.empty())
@@ -1369,16 +1367,59 @@ static void purge_old_logs(const std::string &log_dir, int retain_days)
         fprintf(stderr, "[cleanup] purged %d file(s) older than %d days\n", removed, retain_days);
 }
 
-static std::string history_read_file(const std::string &log_dir,
-                                     const std::string &path)
+/* Resolve a client-supplied relative path safely.
+ *
+ * 1. Reject any rel that contains a NUL byte, is empty, or starts with '/'.
+ * 2. Construct candidate = log_dir + "/" + rel.
+ * 3. Call realpath() to resolve symlinks and canonicalise.
+ * 4. Verify the resolved path still starts with the canonical log_dir.
+ * 5. Optionally enforce an allowed file extension.
+ *
+ * Returns the resolved absolute path on success, or "" on any failure.
+ */
+static std::string safe_resolve(const std::string &log_dir,
+                                const std::string &rel,
+                                const std::string &required_ext = "")
 {
-    if (log_dir.empty() || path.empty()) return "";
-    /* Security: path must start with log_dir */
-    if (path.substr(0, log_dir.size()) != log_dir) return "";
-    /* No ".." components allowed */
-    if (path.find("..") != std::string::npos) return "";
+    if (log_dir.empty() || rel.empty()) return "";
+    /* Reject absolute paths and NUL bytes from client */
+    if (rel[0] == '/' || rel.find('\0') != std::string::npos) return "";
+    /* Reject obvious traversal attempts early (realpath catches the rest) */
+    if (rel.find("..") != std::string::npos) return "";
 
-    FILE *f = fopen(path.c_str(), "r");
+    /* Canonicalise log_dir itself once */
+    char canon_dir_buf[PATH_MAX];
+    if (!realpath(log_dir.c_str(), canon_dir_buf)) return "";
+    std::string canon_dir(canon_dir_buf);
+
+    /* Build candidate and resolve */
+    std::string candidate = canon_dir + "/" + rel;
+    char canon_file_buf[PATH_MAX];
+    if (!realpath(candidate.c_str(), canon_file_buf)) return "";
+    std::string canon_file(canon_file_buf);
+
+    /* Resolved path must be strictly inside canon_dir */
+    if (canon_file.size() <= canon_dir.size()) return "";
+    if (canon_file.substr(0, canon_dir.size()) != canon_dir) return "";
+    if (canon_file[canon_dir.size()] != '/') return "";
+
+    /* Optional extension whitelist */
+    if (!required_ext.empty()) {
+        if (canon_file.size() < required_ext.size()) return "";
+        if (canon_file.substr(canon_file.size() - required_ext.size()) != required_ext)
+            return "";
+    }
+
+    return canon_file;
+}
+
+static std::string history_read_file(const std::string &log_dir,
+                                     const std::string &rel)
+{
+    std::string resolved = safe_resolve(log_dir, rel, ".txt");
+    if (resolved.empty()) return "";
+
+    FILE *f = fopen(resolved.c_str(), "r");
     if (!f) return "";
     std::string content;
     char buf[4096];
@@ -1390,17 +1431,28 @@ static std::string history_read_file(const std::string &log_dir,
 }
 
 /* Read the .json sidecar for a .txt message file, if it exists.
- * Returns empty string if not present or on error. */
+ * The client supplies the .txt relative path; the server derives the .json
+ * path itself — the client never names a .json file directly. */
 static std::string history_read_metrics(const std::string &log_dir,
-                                        const std::string &txt_path)
+                                        const std::string &txt_rel)
 {
-    if (log_dir.empty() || txt_path.empty()) return "";
-    if (txt_path.substr(0, log_dir.size()) != log_dir) return "";
-    if (txt_path.find("..") != std::string::npos) return "";
-    /* Must end in .txt */
-    if (txt_path.size() < 5 || txt_path.substr(txt_path.size()-4) != ".txt") return "";
+    /* Resolve the .txt path first (enforces extension + containment) */
+    std::string resolved_txt = safe_resolve(log_dir, txt_rel, ".txt");
+    if (resolved_txt.empty()) return "";
 
-    std::string json_path = txt_path.substr(0, txt_path.size()-4) + ".json";
+    /* Derive .json path server-side */
+    std::string json_path = resolved_txt.substr(0, resolved_txt.size() - 4) + ".json";
+
+    /* Re-verify the derived .json path is still inside log_dir */
+    char canon_dir_buf[PATH_MAX];
+    if (!realpath(log_dir.c_str(), canon_dir_buf)) return "";
+    std::string canon_dir(canon_dir_buf);
+    /* json_path is constructed from a realpath result so no need to re-resolve,
+     * but we still check containment on the string level. */
+    if (json_path.size() <= canon_dir.size()) return "";
+    if (json_path.substr(0, canon_dir.size()) != canon_dir) return "";
+    if (json_path[canon_dir.size()] != '/') return "";
+
     FILE *f = fopen(json_path.c_str(), "r");
     if (!f) return "";
     std::string content;
@@ -1655,18 +1707,21 @@ int main(int argc, const char **argv)
                 return resp;
             }
 
-            /* GET /api/history/file?path=<absolute-path> — return file content */
+            /* GET /api/history/file?rel=<relative-path> — return .txt file content.
+             * The rel parameter is a path relative to log_dir (as returned by
+             * /api/history).  safe_resolve() canonicalises it with realpath() and
+             * verifies it stays inside log_dir, defeating path traversal and
+             * symlink attacks. */
             if (path_only == "/api/history/file") {
-                std::string file_path;
-                /* Extract path= query param */
+                std::string rel;
                 if (qpos != std::string::npos) {
                     std::string qs = path.substr(qpos + 1);
-                    const std::string key = "path=";
+                    const std::string key = "rel=";
                     auto kpos = qs.find(key);
                     if (kpos != std::string::npos)
-                        file_path = url_decode(qs.substr(kpos + key.size()));
+                        rel = url_decode(qs.substr(kpos + key.size()));
                 }
-                std::string content = history_read_file(log_dir, file_path);
+                std::string content = history_read_file(log_dir, rel);
                 if (content.empty()) {
                     resp->statusCode  = 404;
                     resp->description = "Not Found";
@@ -1681,17 +1736,19 @@ int main(int argc, const char **argv)
                 return resp;
             }
 
-            /* GET /api/history/metrics?path=<absolute-txt-path> — return JSON sidecar */
+            /* GET /api/history/metrics?rel=<relative-txt-path> — return JSON sidecar.
+             * Client supplies the .txt relative path; server derives the .json path
+             * itself — the client never names a .json file directly. */
             if (path_only == "/api/history/metrics") {
-                std::string file_path;
+                std::string rel;
                 if (qpos != std::string::npos) {
                     std::string qs = path.substr(qpos + 1);
-                    const std::string key = "path=";
+                    const std::string key = "rel=";
                     auto kpos = qs.find(key);
                     if (kpos != std::string::npos)
-                        file_path = url_decode(qs.substr(kpos + key.size()));
+                        rel = url_decode(qs.substr(kpos + key.size()));
                 }
-                std::string content = history_read_metrics(log_dir, file_path);
+                std::string content = history_read_metrics(log_dir, rel);
                 if (content.empty()) {
                     resp->statusCode  = 404;
                     resp->description = "Not Found";

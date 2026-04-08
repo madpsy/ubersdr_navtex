@@ -1644,7 +1644,7 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
       btn.className = 'hist-view-btn';
       if (isRaw) {
         btn.textContent = 'Download';
-        btn.onclick = function() { downloadRawLog(m.path, m.freq, m.date); };
+        btn.onclick = function() { downloadRawLog(m.rel, m.freq, m.date); };
       } else {
         btn.textContent = 'View';
         const t = (m.time || '').replace(/Z$/i, '');
@@ -1654,7 +1654,7 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
         const idStr = (m.id && m.id !== 'unknown') ? m.id.toUpperCase() : '—';
         const title = (m.freq || '') + ' · ' + (m.date || '') + ' ' + tFmt + ' · ' + idStr
                     + ' · ' + dec.station;
-        btn.onclick = function() { viewMessage(m.path, title); };
+        btn.onclick = function() { viewMessage(m.rel, title); };
       }
       tdBtn.appendChild(btn);
       tr.appendChild(tdBtn);
@@ -1662,9 +1662,9 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
     });
   }
 
-  function downloadRawLog(path, freq, date) {
+  function downloadRawLog(rel, freq, date) {
     const base = (window._BASE_PATH || '').replace(/\/$/, '');
-    const url = base + '/api/history/file?path=' + encodeURIComponent(path);
+    const url = base + '/api/history/file?rel=' + encodeURIComponent(rel);
     const a = document.createElement('a');
     a.href = url;
     a.download = 'navtex-raw-' + (freq || 'log').replace(/\s/g, '') + '-' + (date || 'log') + '.log';
@@ -1783,10 +1783,11 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
     modal.style.display = 'flex';
     const base = (window._BASE_PATH || '').replace(/\/$/, '');
 
-    /* Fetch message text and metrics sidecar in parallel */
-    const textPromise    = fetch(base + '/api/history/file?path='    + encodeURIComponent(path))
+    /* Fetch message text and metrics sidecar in parallel.
+     * Both endpoints accept a relative path (rel=) — never an absolute path. */
+    const textPromise    = fetch(base + '/api/history/file?rel='    + encodeURIComponent(path))
       .then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); });
-    const metricsPromise = fetch(base + '/api/history/metrics?path=' + encodeURIComponent(path))
+    const metricsPromise = fetch(base + '/api/history/metrics?rel=' + encodeURIComponent(path))
       .then(function(r) { return r.ok ? r.json() : null; })
       .catch(function()  { return null; });
 
