@@ -492,7 +492,96 @@ struct ChannelContext {
     PcmMeta              meta;
     std::vector<uint8_t> decomp_buf;
     std::vector<int16_t> pcm_le;
+
+    /* Raw log — one file per day per frequency, rotated at UTC midnight */
+    FILE        *raw_log_file = nullptr;
+    int          raw_log_year = -1;   /* UTC year of currently-open raw log */
+    int          raw_log_mon  = -1;   /* UTC month (1-12) */
+    int          raw_log_mday = -1;   /* UTC day (1-31) */
 };
+
+/* ------------------------------------------------------------------ */
+/* Raw log helpers (one append-mode file per day per frequency)        */
+/* ------------------------------------------------------------------ */
+
+/* Build the sanitised frequency directory name, e.g. "518kHz" */
+static std::string freq_dir_name(const std::string &label)
+{
+    std::string d = label;
+    d.erase(std::remove(d.begin(), d.end(), ' '), d.end());
+    return d;
+}
+
+/* Open (or re-open) the raw log file for today's UTC date.
+ * Path: <log_dir>/<freq>/raw/<YYYY-MM-DD>.log
+ * The file is opened in append mode so restarts don't lose data. */
+static FILE *open_raw_log(const std::string &log_dir,
+                           const std::string &freq_dir,
+                           int year, int mon, int mday)
+{
+    /* Build directory: <log_dir>/<freq>/raw */
+    char dir_path[512];
+    snprintf(dir_path, sizeof(dir_path), "%s/%s/raw",
+             log_dir.c_str(), freq_dir.c_str());
+
+    /* mkdir -p */
+    {
+        std::string p = dir_path;
+        for (size_t i = 1; i < p.size(); i++) {
+            if (p[i] == '/') {
+                p[i] = '\0';
+                mkdir(p.c_str(), 0755);
+                p[i] = '/';
+            }
+        }
+        mkdir(p.c_str(), 0755);
+    }
+
+    char file_path[640];
+    snprintf(file_path, sizeof(file_path), "%s/%04d-%02d-%02d.log",
+             dir_path, year, mon, mday);
+
+    FILE *f = fopen(file_path, "a");
+    if (!f)
+        fprintf(stderr, "[raw_log] cannot open %s: %s\n",
+                file_path, strerror(errno));
+    else
+        fprintf(stderr, "[raw_log] opened %s\n", file_path);
+    return f;
+}
+
+/* Check whether the UTC date has changed since the raw log was opened.
+ * If so (or if it was never opened), close the old file and open a new one. */
+static void rotate_raw_log_if_needed(ChannelContext *ctx)
+{
+    if (ctx->log_dir.empty()) return;
+
+    auto now = std::chrono::system_clock::now();
+    std::time_t tt = std::chrono::system_clock::to_time_t(now);
+    struct tm utc {};
+    gmtime_r(&tt, &utc);
+
+    int y = utc.tm_year + 1900;
+    int m = utc.tm_mon  + 1;
+    int d = utc.tm_mday;
+
+    if (y == ctx->raw_log_year &&
+        m == ctx->raw_log_mon  &&
+        d == ctx->raw_log_mday)
+        return;  /* still the same day */
+
+    /* Close old file if open */
+    if (ctx->raw_log_file) {
+        fclose(ctx->raw_log_file);
+        ctx->raw_log_file = nullptr;
+    }
+
+    std::string fdir = freq_dir_name(ctx->label);
+    ctx->raw_log_file = open_raw_log(ctx->log_dir, fdir, y, m, d);
+    ctx->raw_log_year = y;
+    ctx->raw_log_mon  = m;
+    ctx->raw_log_mday = d;
+}
 
 /* ------------------------------------------------------------------ */
 /* Message-to-disk logging                                              */
@@ -587,8 +676,17 @@ static ssize_t ws_cookie_write(void *cookie, const char *buf, size_t size)
         std::chrono::steady_clock::now().time_since_epoch()).count();
     ctx->last_char_ms.store((int64_t)now_ms);
 
+    /* Rotate raw log at UTC midnight if logging is enabled */
+    rotate_raw_log_if_needed(ctx);
+
     for (size_t i = 0; i < size; i++) {
         char c = buf[i];
+
+        /* Write to raw log */
+        if (ctx->raw_log_file) {
+            fputc((unsigned char)c, ctx->raw_log_file);
+            fflush(ctx->raw_log_file);
+        }
 
         bool was_in  = ctx->msg_parser.in_msg;
         bool was_cmp = ctx->msg_parser.complete;
@@ -945,7 +1043,7 @@ static void purge_old_logs(const std::string &log_dir, int retain_days)
     std::time_t cutoff = std::chrono::system_clock::to_time_t(
         now - std::chrono::hours(24 * retain_days));
 
-    /* Collect all .txt files */
+    /* Collect all .txt (message) and .log (raw) files */
     std::vector<std::string> files;
     std::function<void(const std::string &)> walk = [&](const std::string &dir) {
         DIR *d = opendir(dir.c_str());
@@ -961,7 +1059,9 @@ static void purge_old_logs(const std::string &log_dir, int retain_days)
                 subdirs.push_back(full);
             else if (S_ISREG(st.st_mode)) {
                 std::string name = ent->d_name;
-                if (name.size() > 4 && name.substr(name.size()-4) == ".txt")
+                bool is_txt = name.size() > 4 && name.substr(name.size()-4) == ".txt";
+                bool is_log = name.size() > 4 && name.substr(name.size()-4) == ".log";
+                if (is_txt || is_log)
                     files.push_back(full);
             }
         }
@@ -1078,6 +1178,9 @@ int main(int argc, const char **argv)
                 "  --freq Hz             NAVTEX carrier frequency in Hz (repeatable, default: 518000 490000)\n"
                 "  --web-port N          local web UI port (default: 6040)\n"
                 "  --log-dir DIR         directory to save decoded messages\n"
+                "                        Also writes a raw character log per frequency:\n"
+                "                          <DIR>/<freq>/raw/<YYYY-MM-DD>.log\n"
+                "                        A new file is started at UTC midnight each day.\n"
                 "  --log-retain-days N   delete log files older than N days (default: 90, 0=disabled)\n"
                 "\n"
                 "Examples:\n"
@@ -1412,6 +1515,7 @@ int main(int argc, const char **argv)
     for (auto &ctx : channels) {
         delete ctx.decoder;
         if (ctx.broadcast_file) fclose(ctx.broadcast_file);
+        if (ctx.raw_log_file)   fclose(ctx.raw_log_file);
     }
     ix::uninitNetSystem();
     fflush(stdout);
