@@ -926,6 +926,101 @@ static std::string history_list_json(const std::string &log_dir)
 
 /* Read a file and return its contents, or empty string on error.
  * Validates that the resolved path starts with log_dir to prevent traversal. */
+/* ------------------------------------------------------------------ */
+/* Log retention / cleanup                                              */
+/* ------------------------------------------------------------------ */
+/* Delete .txt files (and empty parent directories) older than         */
+/* retain_days days.  Runs once immediately, then every hour.          */
+static void purge_old_logs(const std::string &log_dir, int retain_days)
+{
+    if (log_dir.empty() || retain_days <= 0) return;
+
+    auto now = std::chrono::system_clock::now();
+    std::time_t cutoff = std::chrono::system_clock::to_time_t(
+        now - std::chrono::hours(24 * retain_days));
+
+    /* Collect all .txt files */
+    std::vector<std::string> files;
+    std::function<void(const std::string &)> walk = [&](const std::string &dir) {
+        DIR *d = opendir(dir.c_str());
+        if (!d) return;
+        struct dirent *ent;
+        std::vector<std::string> subdirs;
+        while ((ent = readdir(d)) != nullptr) {
+            if (ent->d_name[0] == '.') continue;
+            std::string full = dir + "/" + ent->d_name;
+            struct stat st {};
+            if (stat(full.c_str(), &st) != 0) continue;
+            if (S_ISDIR(st.st_mode))
+                subdirs.push_back(full);
+            else if (S_ISREG(st.st_mode)) {
+                std::string name = ent->d_name;
+                if (name.size() > 4 && name.substr(name.size()-4) == ".txt")
+                    files.push_back(full);
+            }
+        }
+        closedir(d);
+        for (const auto &sub : subdirs) walk(sub);
+    };
+    walk(log_dir);
+
+    int removed = 0;
+    for (const auto &f : files) {
+        struct stat st {};
+        if (stat(f.c_str(), &st) != 0) continue;
+        if (st.st_mtime < cutoff) {
+            if (remove(f.c_str()) == 0) {
+                ++removed;
+                fprintf(stderr, "[cleanup] removed %s\n", f.c_str());
+            }
+        }
+    }
+
+    /* Remove empty directories under log_dir (bottom-up: walk again) */
+    std::function<void(const std::string &)> rmempty = [&](const std::string &dir) {
+        if (dir == log_dir) return;
+        DIR *d = opendir(dir.c_str());
+        if (!d) return;
+        bool empty = true;
+        struct dirent *ent;
+        while ((ent = readdir(d)) != nullptr) {
+            if (ent->d_name[0] == '.') continue;
+            empty = false;
+            break;
+        }
+        closedir(d);
+        if (empty) {
+            if (rmdir(dir.c_str()) == 0)
+                fprintf(stderr, "[cleanup] removed empty dir %s\n", dir.c_str());
+        }
+    };
+    /* Collect dirs, sort deepest-first, then prune */
+    std::vector<std::string> dirs;
+    std::function<void(const std::string &)> collect_dirs = [&](const std::string &dir) {
+        DIR *d = opendir(dir.c_str());
+        if (!d) return;
+        struct dirent *ent;
+        while ((ent = readdir(d)) != nullptr) {
+            if (ent->d_name[0] == '.') continue;
+            std::string full = dir + "/" + ent->d_name;
+            struct stat st {};
+            if (stat(full.c_str(), &st) == 0 && S_ISDIR(st.st_mode)) {
+                collect_dirs(full);
+                dirs.push_back(full);
+            }
+        }
+        closedir(d);
+    };
+    collect_dirs(log_dir);
+    /* Sort deepest paths first (longest path = deepest) */
+    std::sort(dirs.begin(), dirs.end(),
+              [](const std::string &a, const std::string &b){ return a.size() > b.size(); });
+    for (const auto &dir : dirs) rmempty(dir);
+
+    if (removed > 0)
+        fprintf(stderr, "[cleanup] purged %d file(s) older than %d days\n", removed, retain_days);
+}
+
 static std::string history_read_file(const std::string &log_dir,
                                      const std::string &path)
 {
@@ -973,9 +1068,11 @@ int main(int argc, const char **argv)
         fprintf(stderr,
                 "Usage: %s <http://host:port> [--freq Hz] [--freq Hz] [--web-port N]\n"
                 "\n"
-                "  http://host:port   ubersdr server base URL (http or https)\n"
-                "  --freq Hz          NAVTEX carrier frequency in Hz (repeatable, default: 518000 490000)\n"
-                "  --web-port N       local web UI port (default: 6040)\n"
+                "  http://host:port      ubersdr server base URL (http or https)\n"
+                "  --freq Hz             NAVTEX carrier frequency in Hz (repeatable, default: 518000 490000)\n"
+                "  --web-port N          local web UI port (default: 6040)\n"
+                "  --log-dir DIR         directory to save decoded messages\n"
+                "  --log-retain-days N   delete log files older than N days (default: 90, 0=disabled)\n"
                 "\n"
                 "Examples:\n"
                 "  %s http://192.168.1.10:8073\n"
@@ -990,6 +1087,7 @@ int main(int argc, const char **argv)
     std::vector<long> freqs;
     int         web_port = 6040;
     std::string log_dir;             /* empty = logging disabled */
+    int         log_retain_days = 90;
 
     for (int i = 2; i < argc; i++) {
         if (std::string(argv[i]) == "--web-port") {
@@ -1009,6 +1107,17 @@ int main(int argc, const char **argv)
                 return EXIT_FAILURE;
             }
             log_dir = argv[++i];
+        } else if (std::string(argv[i]) == "--log-retain-days") {
+            if (i + 1 >= argc) {
+                fprintf(stderr, "error: --log-retain-days requires a value\n");
+                return EXIT_FAILURE;
+            }
+            char *end = nullptr;
+            log_retain_days = (int)strtol(argv[++i], &end, 10);
+            if (!end || *end != '\0' || log_retain_days < 0) {
+                fprintf(stderr, "invalid --log-retain-days value: %s\n", argv[i]);
+                return EXIT_FAILURE;
+            }
         } else if (std::string(argv[i]) == "--freq") {
             if (i + 1 >= argc) {
                 fprintf(stderr, "error: --freq requires a value\n");
@@ -1237,6 +1346,17 @@ int main(int argc, const char **argv)
 
     /* ---- Start IXWebSocket network system ---- */
     ix::initNetSystem();
+
+    /* ---- Log cleanup thread (runs on startup then every hour) ---- */
+    if (!log_dir.empty() && log_retain_days > 0) {
+        fprintf(stderr, "log retention  : %d days\n", log_retain_days);
+        std::thread([log_dir, log_retain_days]() {
+            while (true) {
+                purge_old_logs(log_dir, log_retain_days);
+                std::this_thread::sleep_for(std::chrono::hours(1));
+            }
+        }).detach();
+    }
 
     /* ---- Spawn one thread per channel ---- */
     std::vector<std::thread> channel_threads;

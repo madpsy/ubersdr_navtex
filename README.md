@@ -69,6 +69,14 @@ Each file contains the full message including the `ZCZC` header line and `NNNN` 
 
 The `docker-compose.yml` bind-mounts `./navtex_logs` on the host to `/data/navtex_logs` inside the container. The `install.sh` script creates this directory automatically.
 
+#### Automatic log retention
+
+Set `NAVTEX_LOG_RETAIN_DAYS` (default: `90`) to automatically delete log files older than that many days. The cleanup runs once at startup and then every hour. Empty date directories are removed after cleanup. Set to `0` to keep all logs indefinitely.
+
+```yaml
+NAVTEX_LOG_RETAIN_DAYS: "90"   # delete files older than 90 days (0 = keep forever)
+```
+
 ---
 
 ## Helper scripts

@@ -11,6 +11,8 @@ services:
       NAVTEX_FREQ_2: "490000"   # National NAVTEX (regional/coastal)
       # Save decoded messages to disk (set to "" to disable)
       NAVTEX_LOG_DIR: "/data/navtex_logs"
+      # Delete log files older than this many days (0 = keep forever)
+      NAVTEX_LOG_RETAIN_DAYS: "90"
       # Uncomment and set as needed:
       # WEB_PORT: "6092"
     volumes:
