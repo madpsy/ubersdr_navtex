@@ -1284,26 +1284,49 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
     /* Render the new character into the DOM */
     if (tsEnabled) {
       if (chr === '\n' || chr === '\r') {
-        /* Start a new .output-line div for the next line */
+        /* Start a new .output-line div for the next line.
+         * Find the last non-divider entry for the stamp (the divider inserted
+         * by updateMsgInfo may now be the last rawLines entry). */
+        let newStamp = utcStamp();
+        for (let ri = rawLines[ch].length - 1; ri >= 0; ri--) {
+          if (!rawLines[ch][ri].divider) { newStamp = rawLines[ch][ri].stamp; break; }
+        }
         const lineDiv = document.createElement('div');
         lineDiv.className = 'output-line';
         const stamp = document.createElement('span');
         stamp.className = 'ts-stamp';
-        stamp.textContent = rawLines[ch][rawLines[ch].length - 1].stamp + ' ';
+        stamp.textContent = newStamp + ' ';
         lineDiv.appendChild(stamp);
         const text = document.createElement('span');
         text.className = 'output-text';
         lineDiv.appendChild(text);
         out.appendChild(lineDiv);
       } else {
-        /* Find or create the last .output-line div */
-        let lineDiv = out.querySelector('.output-line:last-child');
+        /* Find or create the last .output-line div.
+         * We cannot use :last-child because a msg-divider may be the last
+         * child after a ZCZC/NNNN boundary.  Walk backwards instead. */
+        let lineDiv = null;
+        {
+          let node = out.lastElementChild;
+          while (node) {
+            if (node.classList && node.classList.contains('output-line')) {
+              lineDiv = node;
+              break;
+            }
+            node = node.previousElementSibling;
+          }
+        }
         if (!lineDiv) {
+          /* Find the last non-divider rawLines entry for the stamp */
+          let stampVal = utcStamp();
+          for (let ri = rawLines[ch].length - 1; ri >= 0; ri--) {
+            if (!rawLines[ch][ri].divider) { stampVal = rawLines[ch][ri].stamp; break; }
+          }
           lineDiv = document.createElement('div');
           lineDiv.className = 'output-line';
           const stamp = document.createElement('span');
           stamp.className = 'ts-stamp';
-          stamp.textContent = rawLines[ch][rawLines[ch].length - 1].stamp + ' ';
+          stamp.textContent = stampVal + ' ';
           lineDiv.appendChild(stamp);
           const text = document.createElement('span');
           text.className = 'output-text';
