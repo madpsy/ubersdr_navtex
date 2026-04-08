@@ -88,9 +88,9 @@ static std::string make_html_page(const std::string &sdr_url,
             "      <div class=\"stat\"><span class=\"stat-label\">Serial</span>"
                    "<span class=\"stat-value\" id=\"msg-serial-" + s + "\">&mdash;</span></div>\n"
             "      <div class=\"output-actions\" style=\"margin-left:auto;display:flex;gap:5px;align-items:center\">\n"
-            "        <button class=\"icon-btn\" title=\"Clear output\" onclick=\"clearOutput(" + s + ")\" aria-label=\"Clear\">&#x1F5D1;</button>\n"
-            "        <button class=\"icon-btn\" title=\"Copy to clipboard\" onclick=\"copyOutput(" + s + ")\" aria-label=\"Copy\">&#x1F4CB;</button>\n"
-            "        <button class=\"icon-btn\" title=\"Download as text file\" onclick=\"downloadOutput(" + s + ")\" aria-label=\"Download\">&#x2B07;</button>\n"
+            "        <button class=\"icon-btn\" id=\"clear-btn-" + s + "\" title=\"Clear output\" onclick=\"clearOutput(" + s + ")\" aria-label=\"Clear\">&#x1F5D1;</button>\n"
+            "        <button class=\"icon-btn\" id=\"copy-btn-" + s + "\" title=\"Copy to clipboard\" onclick=\"copyOutput(" + s + ")\" aria-label=\"Copy\">&#x1F4CB;</button>\n"
+            "        <button class=\"icon-btn\" id=\"dl-btn-" + s + "\" title=\"Download as text file\" onclick=\"downloadOutput(" + s + ")\" aria-label=\"Download\">&#x2B07;</button>\n"
             "      </div>\n"
             "    </div>\n"
             "    <div class=\"output\" id=\"output-" + s + "\"><span class=\"dim\">Waiting for signal&hellip;</span></div>\n"
@@ -347,20 +347,24 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
 
 /* ---- Output action icon buttons ---- */
 .icon-btn {
-  background: transparent;
-  border: 1px solid #0f3460;
+  background: #16213e;
+  border: 1px solid #2a4a7f;
   border-radius: 4px;
-  color: #555;
+  color: #a0b8d8;
   cursor: pointer;
   font-size: 0.95rem;
   line-height: 1;
   padding: 3px 6px;
-  transition: color 0.2s, border-color 0.2s, background 0.2s;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
 }
 .icon-btn:hover {
-  background: #16213e;
+  background: #1e3a6e;
   border-color: #53d8fb;
   color: #53d8fb;
+}
+.icon-btn:active {
+  background: #0f3460;
+  color: #ffffff;
 }
 </style>
 </head>
@@ -397,6 +401,10 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
   const STATE_NAMES = ['Searching', 'Syncing', 'Locked'];
   const STATE_CLASS = ['dim', 'warn', 'good'];
   const TAB_DOT_CLASS = ['searching', 'syncing', 'locked'];
+
+  /* Per-channel debounce timers for decoder state display */
+  const decStateTimer  = Array(NUM_CHANNELS).fill(null);
+  const decStatePending = Array(NUM_CHANNELS).fill(null);
 
   const NUM_CHANNELS = )HTML" + std::to_string(channels.size()) + R"HTML(;
 
@@ -446,12 +454,16 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
         body.appendChild(clone);
       }
 
-      /* Clone msg-bar */
+      /* Clone msg-bar — strip onclick attrs so cloned buttons don't fire stale handlers */
       const msgBar = srcPanel.querySelector('.msg-bar');
       if (msgBar) {
         const clone = msgBar.cloneNode(true);
-        clone.querySelectorAll('[id]').forEach(function(el) {
-          el.id = el.id + '-s';
+        clone.querySelectorAll('[id]').forEach(function(node) {
+          node.id = node.id + '-s';
+        });
+        /* Remove any inline onclick on cloned buttons (will be re-wired below) */
+        clone.querySelectorAll('button[onclick]').forEach(function(node) {
+          node.removeAttribute('onclick');
         });
         clone.id = 'split-msg-' + i;
         body.appendChild(clone);
@@ -481,6 +493,31 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
         });
         obs.observe(src, { childList: true, subtree: true, characterData: true });
       })(i);
+    }
+
+    /* Wire split-clone action buttons (clear/copy/download/audio) now that they exist */
+    if (window._activeWs) {
+      for (let i = 0; i < NUM_CHANNELS; i++) wireSplitButtons(i, window._activeWs);
+    }
+  }
+
+  /* Wire the cloned action buttons in the split panel for one channel */
+  function wireSplitButtons(ch, ws) {
+    /* Clear / Copy / Download — re-wire onclick on the -s clones */
+    const clearBtn = document.getElementById('clear-btn-' + ch + '-s');
+    if (clearBtn) clearBtn.onclick = function() { clearOutput(ch); };
+    const copyBtn = document.getElementById('copy-btn-' + ch + '-s');
+    if (copyBtn) copyBtn.onclick = function() { copyOutput(ch); };
+    const dlBtn = document.getElementById('dl-btn-' + ch + '-s');
+    if (dlBtn) dlBtn.onclick = function() { downloadOutput(ch); };
+
+    /* Audio button */
+    const splitAudioBtn = document.getElementById('audio-btn-' + ch + '-s');
+    if (splitAudioBtn) {
+      splitAudioBtn.onclick = function() {
+        if (audioState[ch].enabled) audioDisable(ch, ws);
+        else audioEnable(ch, ws);
+      };
     }
   }
 
@@ -642,13 +679,29 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
     }
 
     if (s.decState !== undefined) {
-      const name = STATE_NAMES[s.decState] || '?';
-      const cls  = STATE_CLASS[s.decState] || '';
-      decState.textContent = name;
-      decState.className = 'stat-value ' + cls;
-      if (tabDot) {
-        tabDot.className = 'tab-dot ' + (TAB_DOT_CLASS[s.decState] || '');
-      }
+      /* Debounce: only commit the new state after it has been stable for 1 s */
+      decStatePending[ch] = s.decState;
+      if (decStateTimer[ch] !== null) clearTimeout(decStateTimer[ch]);
+      decStateTimer[ch] = setTimeout(function() {
+        decStateTimer[ch] = null;
+        const st   = decStatePending[ch];
+        const name = STATE_NAMES[st] || '?';
+        const cls  = STATE_CLASS[st] || '';
+        decState.textContent = name;
+        decState.className = 'stat-value ' + cls;
+        if (tabDot) {
+          tabDot.className = 'tab-dot ' + (TAB_DOT_CLASS[st] || '');
+        }
+        /* Sync split-clone dot if split panel is built */
+        const splitDot = document.getElementById('split-dot-' + ch);
+        if (splitDot) splitDot.className = tabDot ? tabDot.className : 'tab-dot';
+        /* Sync split-clone dec-state text */
+        const splitDecState = document.getElementById('dec-state-' + ch + '-s');
+        if (splitDecState) {
+          splitDecState.textContent = name;
+          splitDecState.className   = 'stat-value ' + cls;
+        }
+      }, 1000);
     }
 
     if (s.decState === 2 && s.total > 0) {
@@ -726,15 +779,29 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
     }
   }
 
+  function setAudioBtnState(ch, active) {
+    /* Update both the real button and the split-clone (if it exists) */
+    const ids = ['audio-btn-' + ch, 'audio-btn-' + ch + '-s'];
+    ids.forEach(function(id) {
+      const b = document.getElementById(id);
+      if (!b) return;
+      if (active) {
+        b.className = 'audio-btn active';
+        b.textContent = '\uD83D\uDD0A Audio On';
+      } else {
+        b.className = 'audio-btn';
+        b.textContent = '\uD83D\uDD0A Audio Preview';
+      }
+    });
+  }
+
   function audioEnable(ch, ws) {
     const a = audioState[ch];
     if (a.enabled) return;
     a.ctx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: a.sampleRate });
     a.nextTime = 0; a.queue = [];
     a.enabled = true;
-    const btn = chEl('audio-btn', ch);
-    btn.className = 'audio-btn active';
-    btn.textContent = '\uD83D\uDD0A Audio On';
+    setAudioBtnState(ch, true);
     ws.send(JSON.stringify({ type: 'audio_preview', enable: true, channel: ch }));
   }
 
@@ -743,9 +810,7 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
     if (!a.enabled) return;
     a.enabled = false; a.queue = [];
     if (a.ctx) { a.ctx.close(); a.ctx = null; }
-    const btn = chEl('audio-btn', ch);
-    btn.className = 'audio-btn';
-    btn.textContent = '\uD83D\uDD0A Audio Preview';
+    setAudioBtnState(ch, false);
     ws.send(JSON.stringify({ type: 'audio_preview', enable: false, channel: ch }));
   }
 
@@ -760,7 +825,8 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
     ws.onopen = function() {
       el('status-dot').className = 'connected';
       el('status-text').textContent = 'Connected';
-      /* Wire audio buttons */
+      window._activeWs = ws;
+      /* Wire audio buttons (real panels) and split-clone buttons if already built */
       for (let i = 0; i < NUM_CHANNELS; i++) {
         (function(ch) {
           const btn = chEl('audio-btn', ch);
@@ -768,6 +834,8 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
             if (audioState[ch].enabled) audioDisable(ch, ws);
             else audioEnable(ch, ws);
           };
+          /* Wire split-clone buttons if split panel already exists */
+          if (splitBuilt) wireSplitButtons(ch, ws);
           /* Re-subscribe if audio was active before reconnect */
           if (audioState[ch].enabled)
             ws.send(JSON.stringify({ type: 'audio_preview', enable: true, channel: ch }));
