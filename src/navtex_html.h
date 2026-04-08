@@ -26,7 +26,7 @@ static std::string make_html_page(const std::string &sdr_url,
             "    <button class=\"tab-btn%s\" id=\"tab-btn-%zu\" onclick=\"switchTab(%zu)\">"
             "<span class=\"tab-dot\" id=\"tab-dot-%zu\"></span>"
             "%s <span class=\"tab-name\">%s</span></button>\n",
-            i == 0 ? " active" : "",
+            (false) ? " active" : "",  /* default tab is 'both'; set via switchTab() on load */
             i, i, i,
             channels[i].label.c_str(),
             channels[i].name.c_str());
@@ -41,7 +41,7 @@ static std::string make_html_page(const std::string &sdr_url,
     std::string panels;
     for (size_t i = 0; i < channels.size(); i++) {
         std::string s    = std::to_string(i);
-        std::string disp = (i == 0) ? "flex" : "none";
+        std::string disp = "none";
 
         panels +=
             "  <div class=\"tab-panel\" id=\"panel-" + s + "\" style=\"display:" + disp + "\">\n"
@@ -629,7 +629,7 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
   const decStatePending = Array(NUM_CHANNELS).fill(null);
 
   /* ---- Tab switching ---- */
-  let activeTab = 0;
+  let activeTab = 'both';
   let splitBuilt = false;
 
   function buildSplitPanel() {
@@ -1469,6 +1469,8 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
     if (modal) modal.style.display = 'none';
   }
 
+  /* Default to 'Both' split view on load */
+  switchTab('both');
   connect();
 </script>
 </body>
