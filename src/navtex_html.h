@@ -1,0 +1,610 @@
+/* -*- c++ -*- */
+/*
+ * navtex_html.h — embedded HTML/CSS/JS for the dual-frequency NAVTEX web UI.
+ * Generated as a C++ inline function; included by navtex_rx_from_ubersdr.cpp.
+ *
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
+#pragma once
+#include <string>
+#include <vector>
+
+/* Forward declaration — ChannelContext is defined in the including TU */
+struct ChannelContext;
+
+static std::string make_html_page(const std::string &sdr_url,
+                                  const std::vector<ChannelContext> &channels,
+                                  const std::string &base_path = "")
+{
+    /* ---- Tab buttons ---- */
+    std::string tab_buttons;
+    for (size_t i = 0; i < channels.size(); i++) {
+        char btn[512];
+        snprintf(btn, sizeof(btn),
+            "    <button class=\"tab-btn%s\" id=\"tab-btn-%zu\" onclick=\"switchTab(%zu)\">"
+            "<span class=\"tab-dot\" id=\"tab-dot-%zu\"></span>"
+            "%s <span class=\"tab-name\">%s</span></button>\n",
+            i == 0 ? " active" : "",
+            i, i, i,
+            channels[i].label.c_str(),
+            channels[i].name.c_str());
+        tab_buttons += btn;
+    }
+
+    /* ---- Per-channel panels ---- */
+    std::string panels;
+    for (size_t i = 0; i < channels.size(); i++) {
+        std::string s    = std::to_string(i);
+        std::string disp = (i == 0) ? "flex" : "none";
+
+        panels +=
+            "  <div class=\"tab-panel\" id=\"panel-" + s + "\" style=\"display:" + disp + "\">\n"
+            "    <div class=\"stats-bar\">\n"
+            "      <div class=\"stat\"><span class=\"stat-label\">Signal (dBFS)</span>"
+                   "<span class=\"stat-value\" id=\"bb-val-" + s + "\">&mdash;</span></div>\n"
+            "      <div class=\"stat\"><span class=\"stat-label\">Noise (dBFS/Hz)</span>"
+                   "<span class=\"stat-value\" id=\"nd-val-" + s + "\">&mdash;</span></div>\n"
+            "      <div class=\"stat\"><span class=\"stat-label\">Sample Rate</span>"
+                   "<span class=\"stat-value\" id=\"rate-val-" + s + "\">&mdash;</span></div>\n"
+            "      <div class=\"stat\"><span class=\"stat-label\">Decoder</span>"
+                   "<span class=\"stat-value\" id=\"dec-state-" + s + "\">&mdash;</span></div>\n"
+            "      <div class=\"stat\"><span class=\"stat-label\">FEC Rate</span>"
+                   "<span class=\"stat-value\" id=\"fec-val-" + s + "\">&mdash;</span></div>\n"
+            "      <div class=\"stat\"><span class=\"stat-label\">Errors</span>"
+                   "<span class=\"stat-value\" id=\"err-val-" + s + "\">&mdash;</span></div>\n"
+            "      <div class=\"stat\"><span class=\"stat-label\">Decoding</span>"
+                   "<span class=\"stat-value\">"
+                   "<span class=\"act-dot\" id=\"act-dot-" + s + "\"></span>"
+                   "<span id=\"act-text-" + s + "\">Idle</span></span></div>\n"
+            "      <div class=\"stat\"><span class=\"stat-label\">SNR (dB)</span>"
+                   "<span class=\"stat-value\" id=\"snr-val-" + s + "\">&mdash;</span></div>\n"
+            "      <div class=\"bar-wrap\"><span class=\"stat-label\">Signal Level</span>"
+                   "<div class=\"bar-track\"><div class=\"bar-fill\" id=\"sig-fill-" + s + "\"></div></div></div>\n"
+            "      <div class=\"bar-wrap\"><span class=\"stat-label\">SNR Level</span>"
+                   "<div class=\"bar-track\"><div class=\"snr-fill\" id=\"snr-fill-" + s + "\"></div></div></div>\n"
+            "      <div class=\"bar-wrap\"><span class=\"stat-label\">Quality (clean/fec/err)</span>"
+                   "<div class=\"bar-track fec-track\">"
+                   "<div class=\"fec-clean\" id=\"fec-clean-" + s + "\" style=\"width:0%\"></div>"
+                   "<div class=\"fec-fec\"   id=\"fec-fec-"   + s + "\" style=\"width:0%\"></div>"
+                   "<div class=\"fec-fail\"  id=\"fec-fail-"  + s + "\" style=\"width:0%\"></div>"
+                   "</div></div>\n"
+            "      <button class=\"audio-btn\" id=\"audio-btn-" + s + "\" data-ch=\"" + s + "\">"
+                   "&#x1F50A; Audio Preview</button>\n"
+            "    </div>\n"
+            "    <div class=\"msg-bar idle\" id=\"msg-bar-" + s + "\">\n"
+            "      <div class=\"stat\"><span class=\"stat-label\">Message</span>"
+                   "<span class=\"stat-value\">"
+                   "<span class=\"msg-dot\" id=\"msg-dot-" + s + "\"></span>"
+                   "<span id=\"msg-status-" + s + "\">Idle</span></span></div>\n"
+            "      <div class=\"stat\"><span class=\"stat-label\">Station</span>"
+                   "<span class=\"stat-value\" id=\"msg-station-" + s + "\">&mdash;</span></div>\n"
+            "      <div class=\"stat\"><span class=\"stat-label\">Subject</span>"
+                   "<span class=\"stat-value\" id=\"msg-subject-" + s + "\">&mdash;</span></div>\n"
+            "      <div class=\"stat\"><span class=\"stat-label\">Serial</span>"
+                   "<span class=\"stat-value\" id=\"msg-serial-" + s + "\">&mdash;</span></div>\n"
+            "    </div>\n"
+            "    <div class=\"output\" id=\"output-" + s + "\"><span class=\"dim\">Waiting for signal&hellip;</span></div>\n"
+            "  </div>\n";
+    }
+
+    /* ---- Assemble full page ---- */
+    std::string html = R"HTML(<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NAVTEX Decoder</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Courier New', Courier, monospace;
+  background: #1a1a2e;
+  color: #e0e0e0;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  padding: 12px;
+  gap: 8px;
+  overflow: hidden;
+}
+header {
+  background: #16213e;
+  border: 1px solid #0f3460;
+  border-radius: 6px;
+  padding: 8px 14px;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transform: uppercase; }
+.info-item { display: flex; flex-direction: column; gap: 2px; }
+.info-label { font-size: 0.6rem; color: #888; text-transform: uppercase; letter-spacing: 1px; }
+.info-value { font-size: 0.85rem; color: #53d8fb; }
+#status-dot {
+  width: 9px; height: 9px; border-radius: 50%; background: #555;
+  display: inline-block; margin-right: 5px; transition: background 0.3s;
+}
+#status-dot.connected    { background: #4caf50; }
+#status-dot.disconnected { background: #e94560; }
+
+/* ---- Tab bar ---- */
+.tab-bar {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.tab-btn {
+  background: #16213e;
+  border: 1px solid #0f3460;
+  border-bottom: none;
+  border-radius: 6px 6px 0 0;
+  color: #888;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.85rem;
+  padding: 7px 18px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  transition: background 0.2s, color 0.2s;
+}
+.tab-btn:hover { background: #1e2d50; color: #ccc; }
+.tab-btn.active {
+  background: #0d0d1a;
+  border-color: #0f3460;
+  color: #53d8fb;
+}
+.tab-name { font-size: 0.72rem; color: inherit; opacity: 0.75; }
+.tab-dot {
+  width: 8px; height: 8px; border-radius: 50%; background: #444;
+  display: inline-block; transition: background 0.4s;
+}
+.tab-dot.locked   { background: #4caf50; box-shadow: 0 0 5px #4caf50; }
+.tab-dot.syncing  { background: #ffeb3b; box-shadow: 0 0 5px #ffeb3b; }
+.tab-dot.searching{ background: #555; }
+
+/* ---- Tab content area ---- */
+.tab-content {
+  flex: 1;
+  background: #0d0d1a;
+  border: 1px solid #0f3460;
+  border-radius: 0 6px 6px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  overflow: hidden;
+  min-height: 0;
+}
+.tab-panel {
+  flex-direction: column;
+  flex: 1;
+  gap: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* ---- Stats bar ---- */
+.stats-bar {
+  background: #16213e;
+  border-bottom: 1px solid #0f3460;
+  padding: 7px 14px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  font-size: 0.8rem;
+  flex-shrink: 0;
+}
+.stat { display: flex; flex-direction: column; gap: 2px; min-width: 70px; }
+.stat-label { font-size: 0.58rem; color: #888; text-transform: uppercase; letter-spacing: 1px; }
+.stat-value { color: #53d8fb; }
+.stat-value.good { color: #4caf50; }
+.stat-value.warn { color: #ffeb3b; }
+.stat-value.bad  { color: #e94560; }
+.stat-value.dim  { color: #555; }
+.act-dot {
+  width: 8px; height: 8px; border-radius: 50%; background: #333;
+  display: inline-block; margin-right: 4px; transition: background 0.5s;
+}
+.act-dot.active { background: #4caf50; box-shadow: 0 0 5px #4caf50; }
+.bar-wrap { flex: 1; min-width: 100px; display: flex; flex-direction: column; gap: 3px; }
+.bar-track {
+  height: 7px; background: #0d0d1a; border-radius: 4px; overflow: hidden;
+  border: 1px solid #0f3460;
+}
+.fec-track { display: flex; }
+.bar-fill {
+  height: 100%; width: 0%;
+  background: linear-gradient(90deg, #1a6b1a, #4caf50, #ffeb3b, #e94560);
+  border-radius: 4px;
+}
+.snr-fill {
+  height: 100%; width: 0%; border-radius: 4px;
+  transition: width 0.3s, background 0.3s; background: #4caf50;
+}
+.fec-clean { height: 100%; background: #4caf50; transition: width 0.3s; }
+.fec-fec   { height: 100%; background: #ffeb3b; transition: width 0.3s; }
+.fec-fail  { height: 100%; background: #e94560; transition: width 0.3s; }
+.audio-btn {
+  background: #0f3460; border: 1px solid #1a6b8a; color: #53d8fb;
+  border-radius: 4px; padding: 4px 9px; cursor: pointer;
+  font-family: inherit; font-size: 0.75rem; letter-spacing: 0.5px;
+  transition: background 0.2s, color 0.2s; white-space: nowrap;
+}
+.audio-btn:hover { background: #1a6b8a; }
+.audio-btn.active { background: #1a6b1a; border-color: #4caf50; color: #4caf50; }
+
+/* ---- Message bar ---- */
+.msg-bar {
+  background: #16213e;
+  border-bottom: 1px solid #0f3460;
+  padding: 6px 14px;
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+  font-size: 0.8rem;
+  transition: opacity 0.4s;
+  flex-shrink: 0;
+}
+.msg-bar.idle { opacity: 0.4; }
+.msg-bar .stat { min-width: 55px; }
+.msg-dot {
+  width: 8px; height: 8px; border-radius: 50%; background: #333;
+  display: inline-block; margin-right: 4px; transition: background 0.3s;
+}
+.msg-dot.receiving { background: #ffeb3b; box-shadow: 0 0 5px #ffeb3b; }
+.msg-dot.complete  { background: #4caf50; box-shadow: 0 0 5px #4caf50; }
+
+/* ---- Output area ---- */
+.output {
+  flex: 1;
+  padding: 12px 14px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+  font-size: 0.92rem;
+  line-height: 1.5;
+  color: #b0ffb0;
+  min-height: 0;
+}
+.output .dim { color: #555; }
+</style>
+</head>
+<body>
+<header>
+  <h1>&#x1F4E1; NAVTEX</h1>
+  <div class="info-item">
+    <span class="info-label">SDR Server</span>
+    <span class="info-value">)HTML" + sdr_url + R"HTML(</span>
+  </div>
+  <div class="info-item">
+    <span class="info-label">Status</span>
+    <span class="info-value"><span id="status-dot"></span><span id="status-text">Connecting&hellip;</span></span>
+  </div>
+</header>
+<div class="tab-bar">
+)HTML" + tab_buttons + R"HTML(</div>
+<div class="tab-content">
+)HTML" + panels + R"HTML(</div>
+<script>
+  const SUBJECT = {
+    A:'Nav Warning', B:'Met Warning', C:'Ice', D:'SAR',
+    E:'Met Forecast', F:'Pilot Service', G:'AIS', H:'LORAN',
+    I:'Omega', J:'Satnav', K:'Other Nav', L:'Nav Warning (LORAN)',
+    T:'Test', X:'Special', Z:'No msg'
+  };
+  const STATE_NAMES = ['Searching', 'Syncing', 'Locked'];
+  const STATE_CLASS = ['dim', 'warn', 'good'];
+  const TAB_DOT_CLASS = ['searching', 'syncing', 'locked'];
+
+  const NUM_CHANNELS = )HTML" + std::to_string(channels.size()) + R"HTML(;
+
+  /* Per-channel first-char flag */
+  const firstChar = Array(NUM_CHANNELS).fill(true);
+
+  /* ---- Tab switching ---- */
+  let activeTab = 0;
+  function switchTab(ch) {
+    for (let i = 0; i < NUM_CHANNELS; i++) {
+      const btn   = document.getElementById('tab-btn-' + i);
+      const panel = document.getElementById('panel-' + i);
+      if (i === ch) {
+        btn.classList.add('active');
+        panel.style.display = 'flex';
+      } else {
+        btn.classList.remove('active');
+        panel.style.display = 'none';
+      }
+    }
+    activeTab = ch;
+  }
+
+  /* ---- DOM element helpers ---- */
+  function el(id) { return document.getElementById(id); }
+  function chEl(name, ch) { return el(name + '-' + ch); }
+
+  /* ---- Stats update ---- */
+  function updateStats(ch, s) {
+    const bbEl     = chEl('bb-val',   ch);
+    const ndEl     = chEl('nd-val',   ch);
+    const rateEl   = chEl('rate-val', ch);
+    const actDot   = chEl('act-dot',  ch);
+    const actTxt   = chEl('act-text', ch);
+    const sigFill  = chEl('sig-fill', ch);
+    const snrVal   = chEl('snr-val',  ch);
+    const snrFill  = chEl('snr-fill', ch);
+    const decState = chEl('dec-state',ch);
+    const fecVal   = chEl('fec-val',  ch);
+    const errVal   = chEl('err-val',  ch);
+    const fecClean = chEl('fec-clean',ch);
+    const fecFec   = chEl('fec-fec',  ch);
+    const fecFail  = chEl('fec-fail', ch);
+    const tabDot   = chEl('tab-dot',  ch);
+
+    if (s.bb !== undefined) {
+      if (isFinite(s.bb)) {
+        bbEl.textContent = s.bb.toFixed(1);
+        const pct = Math.max(0, Math.min(100, (s.bb + 120) / 120 * 100));
+        sigFill.style.width = pct + '%';
+      } else {
+        bbEl.textContent = '\u2014';
+        sigFill.style.width = '0%';
+      }
+    }
+    if (s.nd !== undefined)
+      ndEl.textContent = isFinite(s.nd) ? s.nd.toFixed(1) : '\u2014';
+
+    if (s.bb !== undefined && s.nd !== undefined && isFinite(s.bb) && isFinite(s.nd)) {
+      const snr = s.bb - s.nd;
+      snrVal.textContent = snr.toFixed(1) + ' dB';
+      snrVal.className = 'stat-value ' + (snr > 45 ? 'good' : snr > 35 ? 'warn' : 'bad');
+      const snrPct = Math.max(0, Math.min(100, (snr - 25) / 35 * 100));
+      snrFill.style.width = snrPct + '%';
+      snrFill.style.background = snr > 45 ? '#4caf50' : snr > 35 ? '#ffeb3b' : '#e94560';
+    } else if (s.bb !== undefined) {
+      snrVal.textContent = '\u2014'; snrVal.className = 'stat-value';
+      snrFill.style.width = '0%';
+    }
+
+    if (s.rate !== undefined)
+      rateEl.textContent = (s.rate / 1000).toFixed(1) + ' kHz';
+
+    if (s.act !== undefined) {
+      if (s.act) { actDot.className = 'act-dot active'; actTxt.textContent = 'Active'; }
+      else        { actDot.className = 'act-dot';        actTxt.textContent = 'Idle';   }
+    }
+
+    if (s.decState !== undefined) {
+      const name = STATE_NAMES[s.decState] || '?';
+      const cls  = STATE_CLASS[s.decState] || '';
+      decState.textContent = name;
+      decState.className = 'stat-value ' + cls;
+      if (tabDot) {
+        tabDot.className = 'tab-dot ' + (TAB_DOT_CLASS[s.decState] || '');
+      }
+    }
+
+    if (s.decState === 2 && s.total > 0) {
+      const fecPct = s.fec    / s.total * 100;
+      const errPct = s.failed / s.total * 100;
+      const clnPct = s.clean  / s.total * 100;
+      fecVal.textContent = fecPct.toFixed(0) + '%';
+      fecVal.className = 'stat-value ' + (fecPct > 30 ? 'warn' : 'good');
+      errVal.textContent = errPct.toFixed(0) + '%';
+      errVal.className = 'stat-value ' + (errPct > 10 ? 'bad' : errPct > 3 ? 'warn' : 'good');
+      fecClean.style.width = clnPct.toFixed(1) + '%';
+      fecFec.style.width   = fecPct.toFixed(1) + '%';
+      fecFail.style.width  = errPct.toFixed(1) + '%';
+    } else if (s.decState !== undefined && s.decState !== 2) {
+      fecVal.textContent = '\u2014'; fecVal.className = 'stat-value dim';
+      errVal.textContent = '\u2014'; errVal.className = 'stat-value dim';
+      fecClean.style.width = '0%';
+      fecFec.style.width   = '0%';
+      fecFail.style.width  = '0%';
+    }
+  }
+
+  /* ---- Message info update ---- */
+  function updateMsgInfo(ch, inMsg, done, sta, sub, ser) {
+    const msgBar  = chEl('msg-bar',    ch);
+    const dot     = chEl('msg-dot',    ch);
+    const statTxt = chEl('msg-status', ch);
+    const station = chEl('msg-station',ch);
+    const subject = chEl('msg-subject',ch);
+    const serial  = chEl('msg-serial', ch);
+
+    if (inMsg || done) {
+      msgBar.className = 'msg-bar';
+      if (done) { dot.className = 'msg-dot complete';  statTxt.textContent = 'Complete'; }
+      else      { dot.className = 'msg-dot receiving'; statTxt.textContent = 'Receiving\u2026'; }
+      station.textContent = sta ? String.fromCharCode(sta) : '\u2014';
+      const subCh = sub ? String.fromCharCode(sub) : '';
+      subject.textContent = subCh
+        ? (subCh + (SUBJECT[subCh] ? ' \u2013 ' + SUBJECT[subCh] : ''))
+        : '\u2014';
+      serial.textContent = (ser !== 0xFF) ? String(ser).padStart(2, '0') : '\u2014';
+    } else {
+      msgBar.className = 'msg-bar idle';
+      dot.className = 'msg-dot';
+      statTxt.textContent = 'Idle';
+      station.textContent = '\u2014';
+      subject.textContent = '\u2014';
+      serial.textContent  = '\u2014';
+    }
+  }
+
+  /* ---- Audio preview ---- */
+  const audioState = {};
+  for (let i = 0; i < NUM_CHANNELS; i++) {
+    audioState[i] = { enabled: false, ctx: null, queue: [], nextTime: 0, sampleRate: 12000 };
+  }
+  const AUDIO_AHEAD = 0.1;
+
+  function audioFlush(ch) {
+    const a = audioState[ch];
+    if (!a.ctx || a.queue.length === 0) return;
+    const now = a.ctx.currentTime;
+    if (a.nextTime < now) a.nextTime = now + 0.05;
+    while (a.queue.length > 0) {
+      const samples = a.queue.shift();
+      const buf = a.ctx.createBuffer(1, samples.length, a.sampleRate);
+      buf.copyToChannel(samples, 0);
+      const src = a.ctx.createBufferSource();
+      src.buffer = buf;
+      src.connect(a.ctx.destination);
+      src.start(a.nextTime);
+      a.nextTime += buf.duration;
+    }
+  }
+
+  function audioEnable(ch, ws) {
+    const a = audioState[ch];
+    if (a.enabled) return;
+    a.ctx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: a.sampleRate });
+    a.nextTime = 0; a.queue = [];
+    a.enabled = true;
+    const btn = chEl('audio-btn', ch);
+    btn.className = 'audio-btn active';
+    btn.textContent = '\uD83D\uDD0A Audio On';
+    ws.send(JSON.stringify({ type: 'audio_preview', enable: true, channel: ch }));
+  }
+
+  function audioDisable(ch, ws) {
+    const a = audioState[ch];
+    if (!a.enabled) return;
+    a.enabled = false; a.queue = [];
+    if (a.ctx) { a.ctx.close(); a.ctx = null; }
+    const btn = chEl('audio-btn', ch);
+    btn.className = 'audio-btn';
+    btn.textContent = '\uD83D\uDD0A Audio Preview';
+    ws.send(JSON.stringify({ type: 'audio_preview', enable: false, channel: ch }));
+  }
+
+  /* ---- WebSocket connection ---- */
+  const BASE_PATH = (typeof window._BASE_PATH === 'string') ? window._BASE_PATH : '';
+
+  function connect() {
+    const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+    const ws = new WebSocket(proto + '://' + location.host + BASE_PATH + '/ws');
+    ws.binaryType = 'arraybuffer';
+
+    ws.onopen = function() {
+      el('status-dot').className = 'connected';
+      el('status-text').textContent = 'Connected';
+      /* Wire audio buttons */
+      for (let i = 0; i < NUM_CHANNELS; i++) {
+        (function(ch) {
+          const btn = chEl('audio-btn', ch);
+          btn.onclick = function() {
+            if (audioState[ch].enabled) audioDisable(ch, ws);
+            else audioEnable(ch, ws);
+          };
+          /* Re-subscribe if audio was active before reconnect */
+          if (audioState[ch].enabled)
+            ws.send(JSON.stringify({ type: 'audio_preview', enable: true, channel: ch }));
+        })(i);
+      }
+    };
+
+    ws.onclose = function() {
+      el('status-dot').className = 'disconnected';
+      el('status-text').textContent = 'Disconnected \u2014 reconnecting\u2026';
+      setTimeout(connect, 3000);
+    };
+
+    ws.onerror = function() { ws.close(); };
+
+    ws.onmessage = function(e) {
+      if (e.data instanceof ArrayBuffer) {
+        const v    = new DataView(e.data);
+        const type = v.getUint8(0);
+        const ch   = v.getUint8(1);
+
+        /* 0x02 stats frame (22 bytes) */
+        if (type === 0x02 && e.data.byteLength >= 22) {
+          const bb    = v.getFloat32(2,  true);
+          const nd    = v.getFloat32(6,  true);
+          const flags = v.getUint8(10);
+          const rate  = v.getUint16(11, true) * 1000;
+          const state = v.getUint8(13);
+          const clean = v.getUint8(14);
+          const fec   = v.getUint8(15);
+          const fail  = v.getUint8(16);
+          updateStats(ch, {
+            bb:       (flags & 0x01) ? bb : undefined,
+            nd:       (flags & 0x01) ? nd : undefined,
+            rate:     rate,
+            act:      (flags & 0x02) ? 1 : 0,
+            decState: state,
+            clean:    clean,
+            fec:      fec,
+            failed:   fail,
+            total:    clean + fec + fail
+          });
+          return;
+        }
+
+        /* 0x03 msg-info frame (6 bytes) */
+        if (type === 0x03 && e.data.byteLength >= 6) {
+          const flags = v.getUint8(2);
+          const inMsg = !!(flags & 0x01);
+          const done  = !!(flags & 0x02);
+          const sta   = v.getUint8(3);
+          const sub   = v.getUint8(4);
+          const ser   = v.getUint8(5);
+          updateMsgInfo(ch, inMsg, done, sta, sub, ser);
+          return;
+        }
+
+        /* 0x04 audio frame */
+        if (type === 0x04) {
+          const a = audioState[ch];
+          if (a.enabled && a.ctx) {
+            const n = (e.data.byteLength - 2) / 2;
+            if (n > 0) {
+              const f32 = new Float32Array(n);
+              for (let i = 0; i < n; i++)
+                f32[i] = v.getInt16(2 + i * 2, true) / 32768.0;
+              a.queue.push(f32);
+              audioFlush(ch);
+            }
+          }
+          return;
+        }
+        return;
+      }
+
+      /* Text frame: channel digit + decoded character, e.g. "0A" */
+      if (typeof e.data === 'string' && e.data.length >= 2) {
+        const ch  = parseInt(e.data[0], 10);
+        const chr = e.data.slice(1);
+        if (ch >= 0 && ch < NUM_CHANNELS) {
+          const out = chEl('output', ch);
+          if (firstChar[ch]) { out.innerHTML = ''; firstChar[ch] = false; }
+          out.appendChild(document.createTextNode(chr));
+          out.scrollTop = out.scrollHeight;
+        }
+      }
+    };
+  }
+
+  connect();
+</script>
+</body>
+</html>
+)HTML";
+
+    /* Inject window._BASE_PATH before </head> */
+    const std::string inject =
+        "<script>window._BASE_PATH = \"" + base_path + "\";</script>\n";
+    const std::string head_close = "</head>";
+    auto pos = html.find(head_close);
+    if (pos != std::string::npos)
+        html.insert(pos, inject);
+
+    return html;
+}

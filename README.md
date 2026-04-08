@@ -1,19 +1,21 @@
 # ubersdr_navtex
 
-Automated NAVTEX receiver for [UberSDR](https://ubersdr.org) — connects to a remote UberSDR instance, tunes to a NAVTEX frequency, decodes the SITOR-B/NAVTEX signal, and serves decoded messages in a live web UI.
+Automated dual-frequency NAVTEX receiver for [UberSDR](https://ubersdr.org) — connects to a remote UberSDR instance, simultaneously monitors both standard NAVTEX frequencies (518 kHz international and 490 kHz national/coastal), decodes the SITOR-B/NAVTEX signals, and serves decoded messages in a live tabbed web UI.
 
 ---
 
 ## How it works
 
 ```
-UberSDR (remote SDR) ──► navtex_rx_from_ubersdr (C++) ──► decoded NAVTEX messages
+                          ┌──► channel 0: 518 kHz (International) ──► tab 0
+UberSDR (remote SDR) ──►  │
+                          └──► channel 1: 490 kHz (National)       ──► tab 1
                                     │
                                     └──► web UI  http://<host>:6092
 ```
 
-- **`navtex_rx_from_ubersdr`** — C++ service that connects to UberSDR via WebSocket, streams demodulated audio, decodes NAVTEX (SITOR-B), and serves a real-time web UI
-- **Web UI** — live decoded text with signal stats (dBFS, SNR, FEC quality, decoder state); served on port 6092
+- **`navtex_rx_from_ubersdr`** — C++ service that opens two simultaneous WebSocket connections to UberSDR (one per frequency), streams demodulated audio for each, decodes NAVTEX (SITOR-B) independently, and serves a real-time tabbed web UI
+- **Web UI** — tabbed interface with one tab per frequency; each tab shows live decoded text, signal stats (dBFS, SNR, FEC quality, decoder state), message info (station/subject/serial), and an audio preview button; served on port 6092
 
 ---
 
@@ -28,7 +30,7 @@ This will:
 2. Pull the latest `madpsy/ubersdr_navtex` image
 3. Start the service
 
-Then edit `~/ubersdr/navtex/docker-compose.yml` to set your UberSDR URL and frequency, and run `./restart.sh`.
+Then edit `~/ubersdr/navtex/docker-compose.yml` to set your UberSDR URL and run `./restart.sh`.
 
 ---
 
@@ -39,8 +41,11 @@ All configuration is via environment variables in `docker-compose.yml`:
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `UBERSDR_URL` | `http://ubersdr:8080` | UberSDR base URL |
-| `NAVTEX_FREQ` | `518000` | NAVTEX carrier frequency in Hz (`518000` = international, `490000` = UK/coastal) |
+| `NAVTEX_FREQ_1` | `518000` | First NAVTEX carrier frequency in Hz (International) |
+| `NAVTEX_FREQ_2` | `490000` | Second NAVTEX carrier frequency in Hz (National/coastal) |
 | `WEB_PORT` | `6092` | Web UI port |
+
+Both frequencies are **always monitored simultaneously** — there is no single-frequency mode.
 
 ---
 
@@ -89,12 +94,14 @@ IXWebSocket is cloned automatically from GitHub if not present.
 
 Open `http://<host>:6092` in a browser to view:
 
-- Real-time decoded NAVTEX characters
-- Signal level and SNR bars
-- Decoder state (Searching / Syncing / Locked)
-- FEC quality (clean / FEC-corrected / failed characters)
-- Current message info (station, subject, serial number)
-- Audio preview (stream decoder audio to browser)
+- **Two tabs** — one per frequency (e.g. `518 kHz International` / `490 kHz National`)
+- Tab status dot: green = Locked, amber = Syncing, grey = Searching
+- Real-time decoded NAVTEX characters (per tab)
+- Signal level and SNR bars (per tab)
+- Decoder state (Searching / Syncing / Locked) (per tab)
+- FEC quality (clean / FEC-corrected / failed characters) (per tab)
+- Current message info (station, subject, serial number) (per tab)
+- Audio preview — stream decoder audio to browser (per tab, one channel at a time)
 
 ---
 
@@ -110,9 +117,9 @@ Open `http://<host>:6092` in a browser to view:
 
 | Frequency | Usage |
 |-----------|-------|
-| `518000` | International NAVTEX (default) |
-| `490000` | National/coastal NAVTEX (e.g. UK) |
-| `4209500` | HF NAVTEX |
+| `518000` | International NAVTEX — English, worldwide (default channel 0) |
+| `490000` | National/coastal NAVTEX — regional language (default channel 1) |
+| `4209500` | HF NAVTEX (set via `NAVTEX_FREQ_1` / `NAVTEX_FREQ_2`) |
 
 ---
 

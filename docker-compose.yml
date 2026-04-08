@@ -6,8 +6,9 @@ services:
     environment:
       # UberSDR base URL
       UBERSDR_URL: "http://ubersdr:8080"
-      # NAVTEX carrier frequency in Hz (518000 = international, 490000 = UK/coastal)
-      NAVTEX_FREQ: "518000"
+      # NAVTEX carrier frequencies in Hz — both are always monitored simultaneously
+      NAVTEX_FREQ_1: "518000"   # International NAVTEX (English, worldwide)
+      NAVTEX_FREQ_2: "490000"   # National NAVTEX (regional/coastal)
       # Uncomment and set as needed:
       # WEB_PORT: "6092"
     networks:
