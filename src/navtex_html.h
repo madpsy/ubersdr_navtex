@@ -957,8 +957,9 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
     if (ch < 0 || ch >= NUM_CHANNELS) return;
     const prev = prevMsgState[ch] || { inMsg: false, done: false };
 
-    /* Detect message start: transition to inMsg=true */
-    if (inMsg && !prev.inMsg && !prev.done) {
+    /* Detect message start: inMsg transitions to true (regardless of prev done state —
+     * a new ZCZC always starts a new message even immediately after a previous NNNN) */
+    if (inMsg && !prev.inMsg) {
       insertDivider(ch, 'start');
     }
     /* Detect message end: transition to done=true */
@@ -1321,23 +1322,21 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
   }
 
   /* Extract plain text from output for copy/download.
-   * Dividers are always stripped. Timestamps are included when the toggle is on. */
+   * Dividers are always stripped. Timestamps are included when the toggle is on.
+   * Never falls back to innerText/textContent — those include divider text. */
   function getOutputText(ch) {
     const lines = rawLines[ch];
-    if (!lines || lines.length === 0) {
-      /* Fallback: read from DOM */
-      const out = chEl('output', ch);
-      return out ? (out.innerText || out.textContent || '') : '';
-    }
+    if (!lines || lines.length === 0) return '';
     const tsEnabled = document.getElementById('ts-toggle') && document.getElementById('ts-toggle').checked;
     return lines
       .filter(function(e) { return !e.divider; })
       .map(function(e) {
-        if (tsEnabled && e.stamp && e.text && e.text.trim().length > 0) {
+        const t = e.text || '';
+        if (tsEnabled && e.stamp && t.trim().length > 0) {
           /* Prepend timestamp only to non-empty lines */
-          return e.stamp + ' ' + e.text;
+          return e.stamp + ' ' + t;
         }
-        return e.text;
+        return t;
       })
       .join('');
   }

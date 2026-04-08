@@ -1151,6 +1151,39 @@ int main(int argc, const char **argv)
     fprintf(stderr, "ubersdr server : %s\n", base_url.c_str());
     fprintf(stderr, "web UI         : http://localhost:%d/\n", web_port);
 
+    /* ---- Validate log directory at startup ---- */
+    if (!log_dir.empty()) {
+        /* Attempt to create the base log directory (mkdir -p) */
+        {
+            std::string p = log_dir;
+            for (size_t i = 1; i < p.size(); i++) {
+                if (p[i] == '/') {
+                    p[i] = '\0';
+                    mkdir(p.c_str(), 0755);
+                    p[i] = '/';
+                }
+            }
+            mkdir(p.c_str(), 0755);
+        }
+        /* Check it is accessible and writable */
+        struct stat st {};
+        if (stat(log_dir.c_str(), &st) != 0 || !S_ISDIR(st.st_mode)) {
+            fprintf(stderr,
+                    "WARNING: log directory '%s' does not exist and could not be created.\n"
+                    "         Message logging is disabled. Rebuild the Docker image to fix this.\n",
+                    log_dir.c_str());
+            log_dir.clear();   /* disable logging to avoid repeated errors */
+        } else if (access(log_dir.c_str(), W_OK) != 0) {
+            fprintf(stderr,
+                    "WARNING: log directory '%s' is not writable by this process.\n"
+                    "         Message logging is disabled. Check directory permissions.\n",
+                    log_dir.c_str());
+            log_dir.clear();
+        } else {
+            fprintf(stderr, "log directory  : %s\n", log_dir.c_str());
+        }
+    }
+
     /* ---- Build channel contexts ---- */
     /* Label/name helpers */
     auto freq_label = [](long hz) -> std::string {
