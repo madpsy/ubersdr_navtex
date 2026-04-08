@@ -936,14 +936,19 @@ static std::string json_escape(const std::string &s)
     return out;
 }
 
-/* Recursively walk log_dir and collect .txt files.
- * Returns a JSON array string, newest-first (sorted by filename path). */
+/* Recursively walk log_dir and collect .txt message files and .log raw files.
+ * Returns a JSON array string, newest-first (sorted by filename path).
+ * Each entry has a "type" field: "msg" for .txt files, "raw" for .log files. */
 static std::string history_list_json(const std::string &log_dir)
 {
     if (log_dir.empty()) return "[]";
 
-    /* Collect all .txt file paths relative to log_dir */
-    std::vector<std::string> files;
+    /* Collect all .txt and .log file paths */
+    struct FileEntry {
+        std::string full;
+        bool is_raw; /* true = .log raw file, false = .txt message file */
+    };
+    std::vector<FileEntry> files;
 
     std::function<void(const std::string &)> walk = [&](const std::string &dir) {
         DIR *d = opendir(dir.c_str());
@@ -960,7 +965,9 @@ static std::string history_list_json(const std::string &log_dir)
             } else if (S_ISREG(st.st_mode)) {
                 std::string name = ent->d_name;
                 if (name.size() > 4 && name.substr(name.size()-4) == ".txt")
-                    files.push_back(full);
+                    files.push_back({full, false});
+                else if (name.size() > 4 && name.substr(name.size()-4) == ".log")
+                    files.push_back({full, true});
             }
         }
         closedir(d);
@@ -969,22 +976,48 @@ static std::string history_list_json(const std::string &log_dir)
     walk(log_dir);
 
     /* Sort newest-first (lexicographic descending on full path works because
-     * the path encodes YYYY/MM/DD/HHMMSS) */
-    std::sort(files.begin(), files.end(), std::greater<std::string>());
+     * the path encodes YYYY/MM/DD/HHMMSS or YYYY-MM-DD) */
+    std::sort(files.begin(), files.end(),
+              [](const FileEntry &a, const FileEntry &b){ return a.full > b.full; });
 
     /* Build JSON array */
     std::string json = "[";
-    for (size_t i = 0; i < files.size(); i++) {
+    bool first = true;
+    for (const auto &fe : files) {
         /* Derive relative path from log_dir */
-        std::string rel = files[i];
+        std::string rel = fe.full;
         if (rel.substr(0, log_dir.size()) == log_dir)
             rel = rel.substr(log_dir.size());
         if (!rel.empty() && rel[0] == '/') rel = rel.substr(1);
 
-        /* rel is like: 518kHz/2025/04/08/143022Z_EA42.txt
-         * Split into components */
         std::string freq, year, month, day, fname;
-        {
+
+        if (fe.is_raw) {
+            /* rel is like: 518kHz/raw/2025-04-08.log
+             * Split: freq / "raw" / filename */
+            size_t p = 0, q;
+            auto tok = [&]() -> std::string {
+                q = rel.find('/', p);
+                std::string t = (q == std::string::npos) ? rel.substr(p) : rel.substr(p, q-p);
+                p = (q == std::string::npos) ? rel.size() : q+1;
+                return t;
+            };
+            freq        = tok();
+            /* skip "raw" component */
+            std::string raw_dir = tok();
+            fname       = tok();
+            /* fname is like "2025-04-08.log" — parse date */
+            std::string date_stem = fname;
+            if (date_stem.size() > 4) date_stem = date_stem.substr(0, date_stem.size()-4); /* strip .log */
+            /* date_stem: "2025-04-08" */
+            if (date_stem.size() == 10) {
+                year  = date_stem.substr(0, 4);
+                month = date_stem.substr(5, 2);
+                day   = date_stem.substr(8, 2);
+            }
+        } else {
+            /* rel is like: 518kHz/2025/04/08/143022Z_EA42.txt
+             * Split into components */
             size_t p = 0, q;
             auto tok = [&]() -> std::string {
                 q = rel.find('/', p);
@@ -999,29 +1032,41 @@ static std::string history_list_json(const std::string &log_dir)
             fname = tok();
         }
 
-        /* Parse filename: HHMMSSZ_<id>.txt */
-        std::string time_part, id_part;
-        {
+        /* Parse message filename: HHMMSSZ_<id>.txt */
+        std::string time_part, id_part, serial_part;
+        if (!fe.is_raw) {
             size_t us = fname.find('_');
             if (us != std::string::npos) {
                 time_part = fname.substr(0, us);   /* e.g. "143022Z" */
                 id_part   = fname.substr(us+1);    /* e.g. "EA42.txt" */
                 /* strip .txt */
                 if (id_part.size() > 4) id_part = id_part.substr(0, id_part.size()-4);
+                /* Extract serial: last 2 chars of id if they are digits, e.g. "EA42" -> "42" */
+                if (id_part.size() >= 3) {
+                    std::string tail = id_part.substr(id_part.size() - 2);
+                    if (tail[0] >= '0' && tail[0] <= '9' &&
+                        tail[1] >= '0' && tail[1] <= '9')
+                        serial_part = tail;
+                }
             } else {
                 time_part = fname;
                 id_part   = "";
             }
         }
 
-        if (i > 0) json += ",";
+        if (!first) json += ",";
+        first = false;
         json += "{";
-        json += "\"path\":\"" + json_escape(files[i]) + "\"";
+        json += "\"type\":\""   + std::string(fe.is_raw ? "raw" : "msg") + "\"";
+        json += ",\"path\":\"" + json_escape(fe.full)  + "\"";
         json += ",\"rel\":\""  + json_escape(rel)       + "\"";
         json += ",\"freq\":\""  + json_escape(freq)      + "\"";
         json += ",\"date\":\""  + json_escape(year + "-" + month + "-" + day) + "\"";
-        json += ",\"time\":\""  + json_escape(time_part) + "\"";
-        json += ",\"id\":\""    + json_escape(id_part)   + "\"";
+        if (!fe.is_raw) {
+            json += ",\"time\":\""   + json_escape(time_part)   + "\"";
+            json += ",\"id\":\""     + json_escape(id_part)     + "\"";
+            json += ",\"serial\":\"" + json_escape(serial_part) + "\"";
+        }
         json += "}";
     }
     json += "]";

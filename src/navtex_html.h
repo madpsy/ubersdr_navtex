@@ -535,7 +535,12 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
       <button class="hist-close" onclick="closeHistory()" title="Close">&times;</button>
     </div>
     <div class="hist-toolbar">
-      <input type="text" id="hist-search" placeholder="Search messages&hellip;" oninput="filterHistory()" class="hist-search-input">
+      <input type="text" id="hist-search" placeholder="Search&hellip;" oninput="filterHistory()" class="hist-search-input">
+      <select id="hist-type-filter" onchange="filterHistory()" class="hist-freq-select">
+        <option value="">Messages &amp; Raw Logs</option>
+        <option value="msg">Messages only</option>
+        <option value="raw">Raw Logs only</option>
+      </select>
       <select id="hist-freq-filter" onchange="filterHistory()" class="hist-freq-select">
         <option value="">All frequencies</option>
       </select>
@@ -548,6 +553,7 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
             <th>Time (UTC)</th>
             <th>Frequency</th>
             <th>ID</th>
+            <th>Serial</th>
             <th>Station</th>
             <th>Subject</th>
             <th></th>
@@ -1357,6 +1363,7 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
     /* Reset UI */
     document.getElementById('hist-search').value = '';
     document.getElementById('hist-freq-filter').value = '';
+    document.getElementById('hist-type-filter').value = '';
     document.getElementById('hist-empty').style.display   = 'none';
     document.getElementById('hist-loading').style.display = 'block';
     document.getElementById('hist-tbody').innerHTML = '';
@@ -1395,11 +1402,15 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
   function filterHistory() {
     const q    = (document.getElementById('hist-search').value || '').toLowerCase();
     const freq = (document.getElementById('hist-freq-filter').value || '');
+    const type = (document.getElementById('hist-type-filter').value || '');
     const filtered = _histData.filter(function(m) {
+      if (type && (m.type || 'msg') !== type) return false;
       if (freq && m.freq !== freq) return false;
       if (q) {
-        const dec = decodeNavtexId(m.id);
-        const hay = (m.freq + ' ' + m.date + ' ' + m.time + ' ' + m.id + ' '
+        const dec = decodeNavtexId(m.id || '');
+        const serial = m.serial || dec.serial || '';
+        const hay = (m.freq + ' ' + (m.date || '') + ' ' + (m.time || '') + ' '
+                   + (m.id || '') + ' ' + serial + ' '
                    + dec.station + ' ' + dec.subject).toLowerCase();
         if (hay.indexOf(q) === -1) return false;
       }
@@ -1414,55 +1425,105 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
     tbody.innerHTML = '';
     if (rows.length === 0) {
       empty.style.display   = 'block';
-      empty.textContent     = 'No messages found.';
+      empty.textContent     = 'No entries found.';
       return;
     }
     empty.style.display = 'none';
     rows.forEach(function(m) {
-      const dec = decodeNavtexId(m.id);
+      const isRaw = (m.type === 'raw');
+      const dec = isRaw ? { station: '—', subject: '—', serial: '—' } : decodeNavtexId(m.id || '');
       const tr = document.createElement('tr');
+
       /* Date */
       const tdDate = document.createElement('td');
+      tdDate.className = 'hist-date';
       tdDate.textContent = m.date || '—';
       tr.appendChild(tdDate);
-      /* Time — strip trailing 'Z' from HHMMSSZ, format as HH:MM:SS */
+
+      /* Time — only for message files; raw logs span a whole day */
       const tdTime = document.createElement('td');
-      const t = (m.time || '').replace(/Z$/i, '');
-      const tFmt = t.length === 6
-        ? t.slice(0,2) + ':' + t.slice(2,4) + ':' + t.slice(4,6) + ' UTC'
-        : (m.time || '—');
-      tdTime.textContent = tFmt;
+      tdTime.className = 'hist-time';
+      if (isRaw) {
+        const badge = document.createElement('span');
+        badge.style.cssText = 'font-size:0.7rem;background:#1a3a5c;color:#53d8fb;'
+                            + 'border-radius:3px;padding:1px 5px;letter-spacing:0.5px;';
+        badge.textContent = 'RAW LOG';
+        tdTime.appendChild(badge);
+      } else {
+        const t = (m.time || '').replace(/Z$/i, '');
+        tdTime.textContent = t.length === 6
+          ? t.slice(0,2) + ':' + t.slice(2,4) + ':' + t.slice(4,6) + ' UTC'
+          : (m.time || '—');
+      }
       tr.appendChild(tdTime);
+
       /* Frequency */
       const tdFreq = document.createElement('td');
+      tdFreq.className = 'hist-freq';
       tdFreq.textContent = m.freq || '—';
       tr.appendChild(tdFreq);
-      /* ID (raw code, e.g. "EA42") */
+
+      /* ID (raw code, e.g. "EA42") — blank for raw logs */
       const tdId = document.createElement('td');
-      tdId.textContent = (m.id && m.id !== 'unknown') ? m.id.toUpperCase() : '—';
-      tdId.style.fontFamily = 'monospace';
+      tdId.className = 'hist-id';
+      tdId.textContent = isRaw ? '—' : ((m.id && m.id !== 'unknown') ? m.id.toUpperCase() : '—');
       tr.appendChild(tdId);
+
+      /* Serial — from server-parsed field, or decoded from id */
+      const tdSerial = document.createElement('td');
+      tdSerial.style.fontFamily = 'monospace';
+      tdSerial.style.color = '#a0b8d8';
+      if (!isRaw) {
+        const ser = m.serial || dec.serial || '';
+        tdSerial.textContent = (ser && ser !== '—') ? ser : '—';
+      } else {
+        tdSerial.textContent = '—';
+      }
+      tr.appendChild(tdSerial);
+
       /* Station */
       const tdStation = document.createElement('td');
-      tdStation.textContent = dec.station;
+      tdStation.textContent = isRaw ? '—' : dec.station;
       tr.appendChild(tdStation);
+
       /* Subject */
       const tdSubject = document.createElement('td');
-      tdSubject.textContent = dec.subject;
+      tdSubject.textContent = isRaw ? '—' : dec.subject;
       tr.appendChild(tdSubject);
-      /* View button */
+
+      /* View / Download button */
       const tdBtn = document.createElement('td');
       const btn = document.createElement('button');
       btn.className = 'hist-view-btn';
-      btn.textContent = 'View';
-      const idStr = (m.id && m.id !== 'unknown') ? m.id.toUpperCase() : '—';
-      const title = (m.freq || '') + ' · ' + (m.date || '') + ' ' + tFmt + ' · ' + idStr
-                  + ' · ' + dec.station;
-      btn.onclick = function() { viewMessage(m.path, title); };
+      if (isRaw) {
+        btn.textContent = 'Download';
+        btn.onclick = function() { downloadRawLog(m.path, m.freq, m.date); };
+      } else {
+        btn.textContent = 'View';
+        const t = (m.time || '').replace(/Z$/i, '');
+        const tFmt = t.length === 6
+          ? t.slice(0,2) + ':' + t.slice(2,4) + ':' + t.slice(4,6) + ' UTC'
+          : (m.time || '—');
+        const idStr = (m.id && m.id !== 'unknown') ? m.id.toUpperCase() : '—';
+        const title = (m.freq || '') + ' · ' + (m.date || '') + ' ' + tFmt + ' · ' + idStr
+                    + ' · ' + dec.station;
+        btn.onclick = function() { viewMessage(m.path, title); };
+      }
       tdBtn.appendChild(btn);
       tr.appendChild(tdBtn);
       tbody.appendChild(tr);
     });
+  }
+
+  function downloadRawLog(path, freq, date) {
+    const base = (window._BASE_PATH || '').replace(/\/$/, '');
+    const url = base + '/api/history/file?path=' + encodeURIComponent(path);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'navtex-raw-' + (freq || 'log').replace(/\s/g, '') + '-' + (date || 'log') + '.log';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
   }
 
   function viewMessage(path, title) {
