@@ -594,7 +594,6 @@ static ssize_t ws_cookie_write(void *cookie, const char *buf, size_t size)
 
         /* Send the character to the browser FIRST so that the full marker
          * sequence (ZCZC / NNNN) is visible before the divider is inserted. */
-        putchar(c);
         ctx->hub->send_char(ctx->channel_id, c);
 
         bool changed = (ctx->msg_parser.in_msg   != was_in)  ||
@@ -614,7 +613,6 @@ static ssize_t ws_cookie_write(void *cookie, const char *buf, size_t size)
                 save_message(*ctx, ctx->msg_parser);
         }
     }
-    fflush(stdout);
     return (ssize_t)size;
 }
 
