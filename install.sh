@@ -42,6 +42,7 @@ docker compose version >/dev/null 2>&1 || die "docker compose plugin not found â
 
 mkdir -p "${INSTALL_DIR}"
 mkdir -p "${INSTALL_DIR}/navtex_logs"
+chmod a+rwx "${INSTALL_DIR}/navtex_logs"
 cd "${INSTALL_DIR}"
 
 # ---------------------------------------------------------------------------
