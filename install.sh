@@ -14,7 +14,7 @@
 
 set -euo pipefail
 
-REPO_RAW="https://raw.githubusercontent.com/madpsy/ubersdr_navtex/master"
+REPO_RAW="https://raw.githubusercontent.com/madpsy/ubersdr_navtex/main"
 INSTALL_DIR="${HOME}/ubersdr/navtex"
 COMPOSE_FILE="docker-compose.yml"
 FORCE_UPDATE="${FORCE_UPDATE:-0}"
