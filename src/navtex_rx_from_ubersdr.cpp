@@ -294,6 +294,12 @@ static std::string strip_trailing_slash(const std::string &s)
 /* ------------------------------------------------------------------ */
 /* NAVTEX message framing parser (ZCZC / NNNN)                         */
 /* ------------------------------------------------------------------ */
+/* Maximum body size for a single NAVTEX message.  Real messages are at most
+ * a few hundred characters; 8 KiB is very generous.  If a message body grows
+ * beyond this limit we assume NNNN was lost (corrupt transmission or noise
+ * burst) and reset the parser so it can re-sync on the next ZCZC. */
+static constexpr size_t MAX_MSG_BODY = 8192;
+
 struct MsgParser {
     char window[4] = {};
     int  win_pos   = 0;
@@ -355,6 +361,20 @@ struct MsgParser {
                 }
             } else {
                 body += c;
+                /* Safety valve: if the body grows beyond the maximum allowed
+                 * size, the NNNN terminator was almost certainly lost.  Reset
+                 * so the parser can re-sync on the next ZCZC. */
+                if (body.size() > MAX_MSG_BODY) {
+                    in_msg    = false;
+                    complete  = false;
+                    station   = 0;
+                    subject   = 0;
+                    serial    = -1;
+                    hdr_chars = 0;
+                    body.clear();
+                    fprintf(stderr, "[navtex] message body exceeded %zu bytes — "
+                            "assuming lost NNNN, resetting parser\n", MAX_MSG_BODY);
+                }
             }
         }
     }
