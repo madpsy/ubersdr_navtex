@@ -75,7 +75,7 @@ static std::string make_html_page(const std::string &sdr_url,
                    "<div class=\"fec-fail\"  id=\"fec-fail-"  + s + "\" style=\"width:0%\"></div>"
                    "</div></div>\n"
             "      <button class=\"audio-btn\" id=\"audio-btn-" + s + "\" data-ch=\"" + s + "\">"
-                   "&#x1F50A; Audio Preview</button>\n"
+                   "&#x1F50A; Audio</button>\n"
             "    </div>\n"
             "    <div class=\"msg-bar idle\" id=\"msg-bar-" + s + "\">\n"
             "      <div class=\"stat\"><span class=\"stat-label\">Message</span>"
@@ -1025,10 +1025,10 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
       if (!b) return;
       if (active) {
         b.className = 'audio-btn active';
-        b.textContent = '\uD83D\uDD0A Audio On';
+        b.textContent = '\uD83D\uDD0A Audio';
       } else {
         b.className = 'audio-btn';
-        b.textContent = '\uD83D\uDD0A Audio Preview';
+        b.textContent = '\uD83D\uDD0A Audio';
       }
     });
   }
