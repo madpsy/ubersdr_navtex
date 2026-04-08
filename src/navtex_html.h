@@ -572,7 +572,11 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
   <div class="hist-dialog hist-dialog-msg">
     <div class="hist-header">
       <span class="hist-title" id="msg-modal-title">Message</span>
-      <button class="hist-close" onclick="closeMsgModal()" title="Close">&times;</button>
+      <div style="display:flex;align-items:center;gap:6px;margin-left:auto">
+        <button class="icon-btn" id="msg-modal-copy-btn" title="Copy to clipboard" aria-label="Copy">&#x1F4CB;</button>
+        <button class="icon-btn" id="msg-modal-dl-btn" title="Download as text file" aria-label="Download">&#x2B07;</button>
+        <button class="hist-close" onclick="closeMsgModal()" title="Close">&times;</button>
+      </div>
     </div>
     <pre id="msg-modal-body" class="msg-modal-body"></pre>
   </div>
@@ -1527,12 +1531,17 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
   }
 
   function viewMessage(path, title) {
-    const modal = document.getElementById('msg-modal');
-    const body  = document.getElementById('msg-modal-body');
-    const ttl   = document.getElementById('msg-modal-title');
+    const modal   = document.getElementById('msg-modal');
+    const body    = document.getElementById('msg-modal-body');
+    const ttl     = document.getElementById('msg-modal-title');
+    const copyBtn = document.getElementById('msg-modal-copy-btn');
+    const dlBtn   = document.getElementById('msg-modal-dl-btn');
     if (!modal || !body) return;
-    ttl.textContent = title || 'Message';
-    body.textContent = 'Loading…';
+    ttl.textContent  = title || 'Message';
+    body.textContent = 'Loading\u2026';
+    /* Reset button state while loading */
+    if (copyBtn) { copyBtn.onclick = null; copyBtn.style.opacity = '0.4'; }
+    if (dlBtn)   { dlBtn.onclick   = null; dlBtn.style.opacity   = '0.4'; }
     modal.style.display = 'flex';
     const base = (window._BASE_PATH || '').replace(/\/$/, '');
     fetch(base + '/api/history/file?path=' + encodeURIComponent(path))
@@ -1542,9 +1551,39 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
       })
       .then(function(text) {
         body.textContent = text;
+        /* Derive a download filename from the path (last component) */
+        const fname = path.split('/').pop() || 'navtex-message.txt';
+        /* Wire copy button */
+        if (copyBtn) {
+          copyBtn.style.opacity = '1';
+          copyBtn.onclick = function() {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+              navigator.clipboard.writeText(text).catch(function() { fallbackCopy(text); });
+            } else {
+              fallbackCopy(text);
+            }
+          };
+        }
+        /* Wire download button */
+        if (dlBtn) {
+          dlBtn.style.opacity = '1';
+          dlBtn.onclick = function() {
+            const blob = new Blob([text], { type: 'text/plain' });
+            const url  = URL.createObjectURL(blob);
+            const a    = document.createElement('a');
+            a.href     = url;
+            a.download = fname;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+          };
+        }
       })
       .catch(function(err) {
         body.textContent = 'Error loading message: ' + err;
+        if (copyBtn) copyBtn.style.opacity = '0.4';
+        if (dlBtn)   dlBtn.style.opacity   = '0.4';
       });
   }
 
