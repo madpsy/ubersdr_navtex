@@ -62,7 +62,8 @@
 #include <vector>
 
 #include <arpa/inet.h>   /* ntohs */
-#include <sys/stat.h>    /* mkdir */
+#include <dirent.h>      /* opendir/readdir */
+#include <sys/stat.h>    /* mkdir, stat */
 
 #include <curl/curl.h>
 #include <zstd.h>
@@ -811,6 +812,159 @@ static void run_channel(ChannelContext *ctx, const std::string &base_url)
 }
 
 /* ------------------------------------------------------------------ */
+/* History API helpers                                                  */
+/* ------------------------------------------------------------------ */
+
+/* Simple JSON string escaping */
+static std::string json_escape(const std::string &s)
+{
+    std::string out;
+    out.reserve(s.size() + 4);
+    for (unsigned char c : s) {
+        if      (c == '"')  out += "\\\"";
+        else if (c == '\\') out += "\\\\";
+        else if (c == '\n') out += "\\n";
+        else if (c == '\r') out += "\\r";
+        else if (c == '\t') out += "\\t";
+        else if (c < 0x20)  { char buf[8]; snprintf(buf,sizeof(buf),"\\u%04x",c); out+=buf; }
+        else                out += (char)c;
+    }
+    return out;
+}
+
+/* Recursively walk log_dir and collect .txt files.
+ * Returns a JSON array string, newest-first (sorted by filename path). */
+static std::string history_list_json(const std::string &log_dir)
+{
+    if (log_dir.empty()) return "[]";
+
+    /* Collect all .txt file paths relative to log_dir */
+    std::vector<std::string> files;
+
+    std::function<void(const std::string &)> walk = [&](const std::string &dir) {
+        DIR *d = opendir(dir.c_str());
+        if (!d) return;
+        struct dirent *ent;
+        std::vector<std::string> subdirs;
+        while ((ent = readdir(d)) != nullptr) {
+            if (ent->d_name[0] == '.') continue;
+            std::string full = dir + "/" + ent->d_name;
+            struct stat st {};
+            if (stat(full.c_str(), &st) != 0) continue;
+            if (S_ISDIR(st.st_mode)) {
+                subdirs.push_back(full);
+            } else if (S_ISREG(st.st_mode)) {
+                std::string name = ent->d_name;
+                if (name.size() > 4 && name.substr(name.size()-4) == ".txt")
+                    files.push_back(full);
+            }
+        }
+        closedir(d);
+        for (const auto &sub : subdirs) walk(sub);
+    };
+    walk(log_dir);
+
+    /* Sort newest-first (lexicographic descending on full path works because
+     * the path encodes YYYY/MM/DD/HHMMSS) */
+    std::sort(files.begin(), files.end(), std::greater<std::string>());
+
+    /* Build JSON array */
+    std::string json = "[";
+    for (size_t i = 0; i < files.size(); i++) {
+        /* Derive relative path from log_dir */
+        std::string rel = files[i];
+        if (rel.substr(0, log_dir.size()) == log_dir)
+            rel = rel.substr(log_dir.size());
+        if (!rel.empty() && rel[0] == '/') rel = rel.substr(1);
+
+        /* rel is like: 518kHz/2025/04/08/143022Z_EA42.txt
+         * Split into components */
+        std::string freq, year, month, day, fname;
+        {
+            size_t p = 0, q;
+            auto tok = [&]() -> std::string {
+                q = rel.find('/', p);
+                std::string t = (q == std::string::npos) ? rel.substr(p) : rel.substr(p, q-p);
+                p = (q == std::string::npos) ? rel.size() : q+1;
+                return t;
+            };
+            freq  = tok();
+            year  = tok();
+            month = tok();
+            day   = tok();
+            fname = tok();
+        }
+
+        /* Parse filename: HHMMSSZ_<id>.txt */
+        std::string time_part, id_part;
+        {
+            size_t us = fname.find('_');
+            if (us != std::string::npos) {
+                time_part = fname.substr(0, us);   /* e.g. "143022Z" */
+                id_part   = fname.substr(us+1);    /* e.g. "EA42.txt" */
+                /* strip .txt */
+                if (id_part.size() > 4) id_part = id_part.substr(0, id_part.size()-4);
+            } else {
+                time_part = fname;
+                id_part   = "";
+            }
+        }
+
+        if (i > 0) json += ",";
+        json += "{";
+        json += "\"path\":\"" + json_escape(files[i]) + "\"";
+        json += ",\"rel\":\""  + json_escape(rel)       + "\"";
+        json += ",\"freq\":\""  + json_escape(freq)      + "\"";
+        json += ",\"date\":\""  + json_escape(year + "-" + month + "-" + day) + "\"";
+        json += ",\"time\":\""  + json_escape(time_part) + "\"";
+        json += ",\"id\":\""    + json_escape(id_part)   + "\"";
+        json += "}";
+    }
+    json += "]";
+    return json;
+}
+
+/* Read a file and return its contents, or empty string on error.
+ * Validates that the resolved path starts with log_dir to prevent traversal. */
+static std::string history_read_file(const std::string &log_dir,
+                                     const std::string &path)
+{
+    if (log_dir.empty() || path.empty()) return "";
+    /* Security: path must start with log_dir */
+    if (path.substr(0, log_dir.size()) != log_dir) return "";
+    /* No ".." components allowed */
+    if (path.find("..") != std::string::npos) return "";
+
+    FILE *f = fopen(path.c_str(), "r");
+    if (!f) return "";
+    std::string content;
+    char buf[4096];
+    size_t n;
+    while ((n = fread(buf, 1, sizeof(buf), f)) > 0)
+        content.append(buf, n);
+    fclose(f);
+    return content;
+}
+
+/* URL-decode a query string value */
+static std::string url_decode(const std::string &s)
+{
+    std::string out;
+    for (size_t i = 0; i < s.size(); i++) {
+        if (s[i] == '%' && i+2 < s.size()) {
+            char hex[3] = { s[i+1], s[i+2], 0 };
+            out += (char)strtol(hex, nullptr, 16);
+            i += 2;
+        } else if (s[i] == '+') {
+            out += ' ';
+        } else {
+            out += s[i];
+        }
+    }
+    return out;
+}
+
+/* ------------------------------------------------------------------ */
 /* main                                                                 */
 /* ------------------------------------------------------------------ */
 int main(int argc, const char **argv)
@@ -946,9 +1100,9 @@ int main(int argc, const char **argv)
     /* ---- Start web server ---- */
     ix::HttpServer web_server(web_port, "0.0.0.0");
 
-    /* HTTP handler: serve the HTML page */
+    /* HTTP handler: serve the HTML page and API endpoints */
     web_server.setOnConnectionCallback(
-        [&base_url, &channels](ix::HttpRequestPtr req,
+        [&base_url, &channels, &log_dir](ix::HttpRequestPtr req,
                                std::shared_ptr<ix::ConnectionState> /*state*/)
         -> ix::HttpResponsePtr
         {
@@ -961,11 +1115,61 @@ int main(int argc, const char **argv)
                     break;
                 }
             }
+
+            const std::string &uri = req->uri;
+
+            /* Strip base_path prefix for routing */
+            std::string path = uri;
+            if (!base_path.empty() && path.substr(0, base_path.size()) == base_path)
+                path = path.substr(base_path.size());
+            /* Strip query string for path matching */
+            std::string path_only = path;
+            auto qpos = path_only.find('?');
+            if (qpos != std::string::npos) path_only = path_only.substr(0, qpos);
+
             auto resp = std::make_shared<ix::HttpResponse>();
+            resp->headers["Access-Control-Allow-Origin"] = "*";
+
+            /* GET /api/history — return JSON list of saved messages */
+            if (path_only == "/api/history") {
+                resp->statusCode  = 200;
+                resp->description = "OK";
+                resp->headers["Content-Type"] = "application/json";
+                resp->body = history_list_json(log_dir);
+                return resp;
+            }
+
+            /* GET /api/history/file?path=<absolute-path> — return file content */
+            if (path_only == "/api/history/file") {
+                std::string file_path;
+                /* Extract path= query param */
+                if (qpos != std::string::npos) {
+                    std::string qs = path.substr(qpos + 1);
+                    const std::string key = "path=";
+                    auto kpos = qs.find(key);
+                    if (kpos != std::string::npos)
+                        file_path = url_decode(qs.substr(kpos + key.size()));
+                }
+                std::string content = history_read_file(log_dir, file_path);
+                if (content.empty()) {
+                    resp->statusCode  = 404;
+                    resp->description = "Not Found";
+                    resp->headers["Content-Type"] = "text/plain";
+                    resp->body = "not found";
+                } else {
+                    resp->statusCode  = 200;
+                    resp->description = "OK";
+                    resp->headers["Content-Type"] = "text/plain; charset=utf-8";
+                    resp->body = content;
+                }
+                return resp;
+            }
+
+            /* Default: serve the HTML page */
             resp->statusCode = 200;
             resp->description = "OK";
             resp->headers["Content-Type"] = "text/html; charset=utf-8";
-            resp->body = make_html_page(base_url, channels, base_path);
+            resp->body = make_html_page(base_url, channels, base_path, !log_dir.empty());
             return resp;
         });
 

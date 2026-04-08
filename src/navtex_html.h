@@ -15,7 +15,8 @@ struct ChannelContext;
 
 static std::string make_html_page(const std::string &sdr_url,
                                   const std::vector<ChannelContext> &channels,
-                                  const std::string &base_path = "")
+                                  const std::string &base_path = "",
+                                  bool logging_enabled = false)
 {
     /* ---- Tab buttons (individual channels) ---- */
     std::string tab_buttons;
@@ -400,6 +401,110 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
   background: #0f3460;
   color: #ffffff;
 }
+
+/* ---- History button ---- */
+.history-btn {
+  background: #16213e;
+  border: 1px solid #2a4a7f;
+  border-radius: 4px;
+  color: #a0b8d8;
+  cursor: pointer;
+  font-size: 0.78rem;
+  padding: 4px 10px;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  white-space: nowrap;
+}
+.history-btn:hover { background: #1e3a6e; border-color: #53d8fb; color: #53d8fb; }
+
+/* ---- History modal overlay ---- */
+.hist-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.72);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  box-sizing: border-box;
+}
+.hist-dialog {
+  background: #0d1b2a;
+  border: 1px solid #1a3a5c;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 860px;
+  max-height: 85vh;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.7);
+  overflow: hidden;
+}
+.hist-dialog-msg { max-width: 700px; }
+.hist-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px 12px;
+  border-bottom: 1px solid #1a3a5c;
+  flex-shrink: 0;
+}
+.hist-title { font-size: 1rem; font-weight: 600; color: #c8dff0; letter-spacing: 0.02em; }
+.hist-close {
+  background: transparent; border: none; color: #557; cursor: pointer;
+  font-size: 1.4rem; line-height: 1; padding: 0 4px;
+  transition: color 0.15s;
+}
+.hist-close:hover { color: #e94560; }
+.hist-toolbar {
+  display: flex; gap: 10px; padding: 10px 18px;
+  border-bottom: 1px solid #1a3a5c; flex-shrink: 0;
+}
+.hist-search-input {
+  flex: 1; background: #16213e; border: 1px solid #2a4a7f;
+  border-radius: 4px; color: #c8dff0; font-size: 0.82rem;
+  padding: 5px 10px; outline: none;
+}
+.hist-search-input:focus { border-color: #53d8fb; }
+.hist-freq-select {
+  background: #16213e; border: 1px solid #2a4a7f;
+  border-radius: 4px; color: #c8dff0; font-size: 0.82rem;
+  padding: 5px 8px; cursor: pointer; outline: none;
+}
+.hist-list-wrap { overflow-y: auto; flex: 1; }
+.hist-table {
+  width: 100%; border-collapse: collapse; font-size: 0.82rem;
+}
+.hist-table thead th {
+  background: #0a1628; color: #557; font-weight: 600;
+  padding: 8px 14px; text-align: left; position: sticky; top: 0;
+  border-bottom: 1px solid #1a3a5c; white-space: nowrap;
+}
+.hist-table tbody tr {
+  border-bottom: 1px solid #111e30;
+  transition: background 0.1s;
+  cursor: pointer;
+}
+.hist-table tbody tr:hover { background: #16213e; }
+.hist-table tbody td { padding: 8px 14px; color: #a0b8d8; vertical-align: middle; }
+.hist-table tbody td.hist-freq { color: #53d8fb; font-family: monospace; }
+.hist-table tbody td.hist-id   { color: #c8dff0; font-family: monospace; font-weight: 600; }
+.hist-table tbody td.hist-date { color: #778; }
+.hist-table tbody td.hist-time { color: #778; font-family: monospace; }
+.hist-view-btn {
+  background: #16213e; border: 1px solid #2a4a7f; border-radius: 3px;
+  color: #a0b8d8; cursor: pointer; font-size: 0.75rem; padding: 3px 8px;
+  transition: color 0.15s, border-color 0.15s;
+}
+.hist-view-btn:hover { border-color: #53d8fb; color: #53d8fb; }
+.hist-empty { padding: 32px; text-align: center; color: #446; font-size: 0.85rem; }
+.msg-modal-body {
+  flex: 1; overflow-y: auto; margin: 0;
+  padding: 16px 20px;
+  font-family: 'Courier New', monospace; font-size: 0.82rem;
+  color: #c8dff0; line-height: 1.6;
+  white-space: pre-wrap; word-break: break-word;
+  background: #0a1628;
+}
 </style>
 </head>
 <body>
@@ -413,11 +518,59 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
     <span class="info-label">Status</span>
     <span class="info-value"><span id="status-dot"></span><span id="status-text">Connecting&hellip;</span></span>
   </div>
-  <label class="ts-label" style="margin-left:auto;display:flex;align-items:center;gap:6px;cursor:pointer;font-size:0.78rem;color:#888;user-select:none">
-    <input type="checkbox" id="ts-toggle" checked style="accent-color:#53d8fb;width:14px;height:14px;cursor:pointer">
-    Timestamps
-  </label>
+  <div style="margin-left:auto;display:flex;align-items:center;gap:12px">
+    <label class="ts-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:0.78rem;color:#888;user-select:none">
+      <input type="checkbox" id="ts-toggle" checked style="accent-color:#53d8fb;width:14px;height:14px;cursor:pointer">
+      Timestamps
+    </label>
+)HTML" + (logging_enabled ? R"HTML(    <button class="history-btn" id="history-btn" onclick="openHistory()">&#x1F4DC; History</button>
+)HTML" : "") + R"HTML(  </div>
 </header>
+
+<!-- History modal -->
+<div id="history-modal" class="hist-overlay" style="display:none" onclick="if(event.target===this)closeHistory()">
+  <div class="hist-dialog">
+    <div class="hist-header">
+      <span class="hist-title">Message History</span>
+      <button class="hist-close" onclick="closeHistory()" title="Close">&times;</button>
+    </div>
+    <div class="hist-toolbar">
+      <input type="text" id="hist-search" placeholder="Search messages&hellip;" oninput="filterHistory()" class="hist-search-input">
+      <select id="hist-freq-filter" onchange="filterHistory()" class="hist-freq-select">
+        <option value="">All frequencies</option>
+      </select>
+    </div>
+    <div class="hist-list-wrap">
+      <table class="hist-table" id="hist-table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Time (UTC)</th>
+            <th>Frequency</th>
+            <th>ID</th>
+            <th>Station</th>
+            <th>Subject</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="hist-tbody"></tbody>
+      </table>
+      <div id="hist-empty" class="hist-empty" style="display:none">No messages found.</div>
+      <div id="hist-loading" class="hist-empty">Loading&hellip;</div>
+    </div>
+  </div>
+</div>
+
+<!-- Message detail modal -->
+<div id="msg-modal" class="hist-overlay" style="display:none" onclick="if(event.target===this)closeMsgModal()">
+  <div class="hist-dialog hist-dialog-msg">
+    <div class="hist-header">
+      <span class="hist-title" id="msg-modal-title">Message</span>
+      <button class="hist-close" onclick="closeMsgModal()" title="Close">&times;</button>
+    </div>
+    <pre id="msg-modal-body" class="msg-modal-body"></pre>
+  </div>
+</div>
 <div class="tab-bar">
 )HTML" + tab_buttons + R"HTML(</div>
 <div class="tab-content">
@@ -432,6 +585,36 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
     I:'Omega', J:'Satnav', K:'Other Nav', L:'Nav Warning (LORAN)',
     T:'Test', X:'Special', Z:'No msg'
   };
+  /* ITU NAVTEX station codes (518 kHz international + 490 kHz national common) */
+  const NAVTEX_STATION = {
+    A:'Svalbard (LGN)',      B:'Vardø (LGN)',          C:'Bjørnøya (LGN)',
+    D:'Rogaland (LGN)',      E:'Malin Head (EJM)',      F:'Niton (GNI)',
+    G:'Cullercoats (GCC)',   H:'Portpatrick (GPK)',     I:'Reykjavik (TFA)',
+    J:'Valentia (EJK)',      K:'Corsen (FFU)',           L:'La Garde (FFM)',
+    M:'Monsanto (CUL)',      N:'Tarifa (EAT)',           O:'Coruña (EAC)',
+    P:'Horta (CUH)',         Q:'Monsanto (CUL)',         R:'Cullercoats (GCC)',
+    S:'Niton (GNI)',         T:'Malin Head (EJM)',       U:'Valentia (EJK)',
+    V:'Portpatrick (GPK)',   W:'Rogaland (LGN)',         X:'Vardø (LGN)',
+    Y:'Bjørnøya (LGN)',      Z:'Svalbard (LGN)',
+    /* 490 kHz national / additional */
+    '0':'Oostende (OST)',    '1':'Niton (GNI)',          '2':'Cullercoats (GCC)',
+    '3':'Portpatrick (GPK)', '4':'Malin Head (EJM)',     '5':'Valentia (EJK)',
+    '6':'Corsen (FFU)',      '7':'La Garde (FFM)',        '8':'Monsanto (CUL)',
+    '9':'Tarifa (EAT)'
+  };
+  function decodeNavtexId(id) {
+    /* id is like "EA42", "BZ", "unknown" */
+    if (!id || id === 'unknown') return { station: '—', subject: '—', serial: '—' };
+    const s = id.toUpperCase();
+    const stCode  = s.length >= 1 ? s[0] : '';
+    const subCode = s.length >= 2 ? s[1] : '';
+    const serial  = s.length >= 3 ? s.slice(2) : '—';
+    return {
+      station: NAVTEX_STATION[stCode] || (stCode ? stCode : '—'),
+      subject: SUBJECT[subCode]        || (subCode ? subCode : '—'),
+      serial:  serial
+    };
+  }
   const STATE_NAMES = ['Searching', 'Syncing', 'Locked'];
   const STATE_CLASS = ['dim', 'warn', 'good'];
   const TAB_DOT_CLASS = ['searching', 'syncing', 'locked'];
@@ -1139,6 +1322,151 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
       .filter(function(e) { return !e.divider; })
       .map(function(e) { return e.text; })
       .join('');
+  }
+
+  /* ── History modal ─────────────────────────────────────────────────── */
+  let _histData = [];   /* cached list from /api/history */
+
+  function openHistory() {
+    const modal = document.getElementById('history-modal');
+    if (!modal) return;
+    modal.style.display = 'flex';
+    /* Reset UI */
+    document.getElementById('hist-search').value = '';
+    document.getElementById('hist-freq-filter').value = '';
+    document.getElementById('hist-empty').style.display   = 'none';
+    document.getElementById('hist-loading').style.display = 'block';
+    document.getElementById('hist-tbody').innerHTML = '';
+    /* Fetch list */
+    const base = (window._BASE_PATH || '').replace(/\/$/, '');
+    fetch(base + '/api/history')
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        _histData = Array.isArray(data) ? data : [];
+        document.getElementById('hist-loading').style.display = 'none';
+        /* Populate frequency filter options */
+        const freqs = [...new Set(_histData.map(function(m) { return m.freq; }))].sort();
+        const sel = document.getElementById('hist-freq-filter');
+        /* Remove old dynamic options (keep first "All frequencies") */
+        while (sel.options.length > 1) sel.remove(1);
+        freqs.forEach(function(f) {
+          const opt = document.createElement('option');
+          opt.value = f;
+          opt.textContent = f;
+          sel.appendChild(opt);
+        });
+        renderHistTable(_histData);
+      })
+      .catch(function(err) {
+        document.getElementById('hist-loading').style.display = 'none';
+        document.getElementById('hist-empty').style.display   = 'block';
+        document.getElementById('hist-empty').textContent     = 'Failed to load history: ' + err;
+      });
+  }
+
+  function closeHistory() {
+    const modal = document.getElementById('history-modal');
+    if (modal) modal.style.display = 'none';
+  }
+
+  function filterHistory() {
+    const q    = (document.getElementById('hist-search').value || '').toLowerCase();
+    const freq = (document.getElementById('hist-freq-filter').value || '');
+    const filtered = _histData.filter(function(m) {
+      if (freq && m.freq !== freq) return false;
+      if (q) {
+        const dec = decodeNavtexId(m.id);
+        const hay = (m.freq + ' ' + m.date + ' ' + m.time + ' ' + m.id + ' '
+                   + dec.station + ' ' + dec.subject).toLowerCase();
+        if (hay.indexOf(q) === -1) return false;
+      }
+      return true;
+    });
+    renderHistTable(filtered);
+  }
+
+  function renderHistTable(rows) {
+    const tbody = document.getElementById('hist-tbody');
+    const empty = document.getElementById('hist-empty');
+    tbody.innerHTML = '';
+    if (rows.length === 0) {
+      empty.style.display   = 'block';
+      empty.textContent     = 'No messages found.';
+      return;
+    }
+    empty.style.display = 'none';
+    rows.forEach(function(m) {
+      const dec = decodeNavtexId(m.id);
+      const tr = document.createElement('tr');
+      /* Date */
+      const tdDate = document.createElement('td');
+      tdDate.textContent = m.date || '—';
+      tr.appendChild(tdDate);
+      /* Time — strip trailing 'Z' from HHMMSSZ, format as HH:MM:SS */
+      const tdTime = document.createElement('td');
+      const t = (m.time || '').replace(/Z$/i, '');
+      const tFmt = t.length === 6
+        ? t.slice(0,2) + ':' + t.slice(2,4) + ':' + t.slice(4,6) + ' UTC'
+        : (m.time || '—');
+      tdTime.textContent = tFmt;
+      tr.appendChild(tdTime);
+      /* Frequency */
+      const tdFreq = document.createElement('td');
+      tdFreq.textContent = m.freq || '—';
+      tr.appendChild(tdFreq);
+      /* ID (raw code, e.g. "EA42") */
+      const tdId = document.createElement('td');
+      tdId.textContent = (m.id && m.id !== 'unknown') ? m.id.toUpperCase() : '—';
+      tdId.style.fontFamily = 'monospace';
+      tr.appendChild(tdId);
+      /* Station */
+      const tdStation = document.createElement('td');
+      tdStation.textContent = dec.station;
+      tr.appendChild(tdStation);
+      /* Subject */
+      const tdSubject = document.createElement('td');
+      tdSubject.textContent = dec.subject;
+      tr.appendChild(tdSubject);
+      /* View button */
+      const tdBtn = document.createElement('td');
+      const btn = document.createElement('button');
+      btn.className = 'hist-view-btn';
+      btn.textContent = 'View';
+      const idStr = (m.id && m.id !== 'unknown') ? m.id.toUpperCase() : '—';
+      const title = (m.freq || '') + ' · ' + (m.date || '') + ' ' + tFmt + ' · ' + idStr
+                  + ' · ' + dec.station;
+      btn.onclick = function() { viewMessage(m.path, title); };
+      tdBtn.appendChild(btn);
+      tr.appendChild(tdBtn);
+      tbody.appendChild(tr);
+    });
+  }
+
+  function viewMessage(path, title) {
+    const modal = document.getElementById('msg-modal');
+    const body  = document.getElementById('msg-modal-body');
+    const ttl   = document.getElementById('msg-modal-title');
+    if (!modal || !body) return;
+    ttl.textContent = title || 'Message';
+    body.textContent = 'Loading…';
+    modal.style.display = 'flex';
+    const base = (window._BASE_PATH || '').replace(/\/$/, '');
+    fetch(base + '/api/history/file?path=' + encodeURIComponent(path))
+      .then(function(r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.text();
+      })
+      .then(function(text) {
+        body.textContent = text;
+      })
+      .catch(function(err) {
+        body.textContent = 'Error loading message: ' + err;
+      });
+  }
+
+  function closeMsgModal() {
+    const modal = document.getElementById('msg-modal');
+    if (modal) modal.style.display = 'none';
   }
 
   connect();
