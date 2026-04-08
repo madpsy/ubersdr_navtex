@@ -9,8 +9,12 @@ services:
       # NAVTEX carrier frequencies in Hz — both are always monitored simultaneously
       NAVTEX_FREQ_1: "518000"   # International NAVTEX (English, worldwide)
       NAVTEX_FREQ_2: "490000"   # National NAVTEX (regional/coastal)
+      # Save decoded messages to disk (set to "" to disable)
+      NAVTEX_LOG_DIR: "/data/navtex_logs"
       # Uncomment and set as needed:
       # WEB_PORT: "6092"
+    volumes:
+      - ./navtex_logs:/data/navtex_logs
     networks:
       - sdr-network
 

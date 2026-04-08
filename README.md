@@ -44,8 +44,30 @@ All configuration is via environment variables in `docker-compose.yml`:
 | `NAVTEX_FREQ_1` | `518000` | First NAVTEX carrier frequency in Hz (International) |
 | `NAVTEX_FREQ_2` | `490000` | Second NAVTEX carrier frequency in Hz (National/coastal) |
 | `WEB_PORT` | `6092` | Web UI port |
+| `NAVTEX_LOG_DIR` | `/data/navtex_logs` | Directory inside the container to save decoded messages. Set to `""` to disable. |
 
 Both frequencies are **always monitored simultaneously** — there is no single-frequency mode.
+
+### Message logging
+
+When `NAVTEX_LOG_DIR` is set (enabled by default), every completed NAVTEX message is saved to disk as a plain-text `.txt` file. The directory structure is:
+
+```
+navtex_logs/
+└── <frequency>/          e.g. 518kHz or 490kHz
+    └── <YYYY>/
+        └── <MM>/
+            └── <DD>/
+                └── <HHMMSS>Z_<station><subject><serial>.txt
+```
+
+For example: `navtex_logs/518kHz/2025/04/08/143022Z_EA42.txt`
+
+If the station/subject/serial header fields are not decoded (e.g. the message was truncated), the filename falls back to `<HHMMSS>Z_unknown.txt`.
+
+Each file contains the full message including the `ZCZC` header line and `NNNN` end marker.
+
+The `docker-compose.yml` bind-mounts `./navtex_logs` on the host to `/data/navtex_logs` inside the container. The `install.sh` script creates this directory automatically.
 
 ---
 

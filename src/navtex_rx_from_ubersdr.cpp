@@ -49,10 +49,12 @@
 
 #include <algorithm>
 #include <atomic>
+#include <cerrno>
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <ctime>
 #include <map>
 #include <mutex>
 #include <string>
@@ -60,6 +62,7 @@
 #include <vector>
 
 #include <arpa/inet.h>   /* ntohs */
+#include <sys/stat.h>    /* mkdir */
 
 #include <curl/curl.h>
 #include <zstd.h>
@@ -301,6 +304,9 @@ struct MsgParser {
     int  hdr_chars  = 0;
     char hdr_buf[4] = {};
 
+    /* Accumulated body text (from after the 4-char header to before NNNN) */
+    std::string body;
+
     void feed(char c)
     {
         window[win_pos & 3] = c;
@@ -317,6 +323,7 @@ struct MsgParser {
             subject   = 0;
             serial    = -1;
             hdr_chars = 0;
+            body.clear();
             return;
         }
         if (is_nnnn && in_msg) {
@@ -324,17 +331,21 @@ struct MsgParser {
             in_msg   = false;
             return;
         }
-        if (in_msg && hdr_chars < 4) {
-            if (c != ' ' && c != '\r' && c != '\n') {
-                hdr_buf[hdr_chars++] = c;
-                if (hdr_chars == 4) {
-                    station = hdr_buf[0];
-                    subject = hdr_buf[1];
-                    int d1  = hdr_buf[2] - '0';
-                    int d2  = hdr_buf[3] - '0';
-                    if (d1 >= 0 && d1 <= 9 && d2 >= 0 && d2 <= 9)
-                        serial = d1 * 10 + d2;
+        if (in_msg) {
+            if (hdr_chars < 4) {
+                if (c != ' ' && c != '\r' && c != '\n') {
+                    hdr_buf[hdr_chars++] = c;
+                    if (hdr_chars == 4) {
+                        station = hdr_buf[0];
+                        subject = hdr_buf[1];
+                        int d1  = hdr_buf[2] - '0';
+                        int d2  = hdr_buf[3] - '0';
+                        if (d1 >= 0 && d1 <= 9 && d2 >= 0 && d2 <= 9)
+                            serial = d1 * 10 + d2;
+                    }
                 }
+            } else {
+                body += c;
             }
         }
     }
@@ -456,6 +467,7 @@ struct ChannelContext {
     long        dial_hz;          /* carrier_hz - 500 */
     std::string label;            /* e.g. "518 kHz" */
     std::string name;             /* e.g. "International" */
+    std::string log_dir;          /* base directory for message logs, empty = disabled */
 
     BroadcastHub *hub = nullptr;  /* shared, not owned */
 
@@ -474,6 +486,87 @@ struct ChannelContext {
     std::vector<uint8_t> decomp_buf;
     std::vector<int16_t> pcm_le;
 };
+
+/* ------------------------------------------------------------------ */
+/* Message-to-disk logging                                              */
+/* ------------------------------------------------------------------ */
+static void save_message(const ChannelContext &ctx, const MsgParser &mp)
+{
+    if (ctx.log_dir.empty()) return;
+    if (mp.body.empty())     return;
+
+    /* UTC timestamp */
+    auto now = std::chrono::system_clock::now();
+    std::time_t tt = std::chrono::system_clock::to_time_t(now);
+    struct tm utc {};
+    gmtime_r(&tt, &utc);
+
+    /* Sanitise label for use as a directory component (e.g. "518 kHz" -> "518kHz") */
+    std::string freq_dir = ctx.label;
+    freq_dir.erase(std::remove(freq_dir.begin(), freq_dir.end(), ' '), freq_dir.end());
+
+    /* Build directory path: <log_dir>/<freq>/<YYYY>/<MM>/<DD>/ */
+    char date_path[512];
+    snprintf(date_path, sizeof(date_path), "%s/%s/%04d/%02d/%02d",
+             ctx.log_dir.c_str(),
+             freq_dir.c_str(),
+             utc.tm_year + 1900,
+             utc.tm_mon  + 1,
+             utc.tm_mday);
+
+    /* mkdir -p equivalent */
+    {
+        std::string p = date_path;
+        for (size_t i = 1; i < p.size(); i++) {
+            if (p[i] == '/') {
+                p[i] = '\0';
+                mkdir(p.c_str(), 0755);
+                p[i] = '/';
+            }
+        }
+        mkdir(p.c_str(), 0755);
+    }
+
+    /* Build filename: <HHMMSS>Z_<station><subject><serial>.txt
+     * Fall back gracefully if station/subject/serial are missing. */
+    char fname[64];
+    char id_part[16] = "unknown";
+    if (mp.station && mp.subject) {
+        if (mp.serial >= 0)
+            snprintf(id_part, sizeof(id_part), "%c%c%02d",
+                     mp.station, mp.subject, mp.serial);
+        else
+            snprintf(id_part, sizeof(id_part), "%c%c",
+                     mp.station, mp.subject);
+    }
+    snprintf(fname, sizeof(fname), "%02d%02d%02dZ_%s.txt",
+             utc.tm_hour, utc.tm_min, utc.tm_sec, id_part);
+
+    /* Full path */
+    std::string full_path = std::string(date_path) + "/" + fname;
+
+    /* Write message: header line + body */
+    FILE *f = fopen(full_path.c_str(), "w");
+    if (!f) {
+        fprintf(stderr, "[ch%d] save_message: cannot open %s: %s\n",
+                ctx.channel_id, full_path.c_str(), strerror(errno));
+        return;
+    }
+
+    /* Reconstruct the ZCZC header line */
+    if (mp.station && mp.subject && mp.serial >= 0)
+        fprintf(f, "ZCZC %c%c%02d\n", mp.station, mp.subject, mp.serial);
+    else if (mp.station && mp.subject)
+        fprintf(f, "ZCZC %c%c\n", mp.station, mp.subject);
+    else
+        fprintf(f, "ZCZC\n");
+
+    fwrite(mp.body.c_str(), 1, mp.body.size(), f);
+    fprintf(f, "NNNN\n");
+    fclose(f);
+
+    fprintf(stderr, "[ch%d] saved message -> %s\n", ctx.channel_id, full_path.c_str());
+}
 
 /* ------------------------------------------------------------------ */
 /* fopencookie write callback — per-channel                             */
@@ -510,6 +603,9 @@ static ssize_t ws_cookie_write(void *cookie, const char *buf, size_t size)
                                     ctx->msg_parser.station,
                                     ctx->msg_parser.subject,
                                     ctx->msg_parser.serial);
+            /* Save completed message to disk (transition: not-complete -> complete) */
+            if (ctx->msg_parser.complete && !was_cmp)
+                save_message(*ctx, ctx->msg_parser);
         }
 
         putchar(c);
@@ -738,7 +834,8 @@ int main(int argc, const char **argv)
     const std::string base_url = strip_slash(argv[1]);
 
     std::vector<long> freqs;
-    int web_port = 6040;
+    int         web_port = 6040;
+    std::string log_dir;             /* empty = logging disabled */
 
     for (int i = 2; i < argc; i++) {
         if (std::string(argv[i]) == "--web-port") {
@@ -752,6 +849,12 @@ int main(int argc, const char **argv)
                 fprintf(stderr, "invalid web port: %s\n", argv[i]);
                 return EXIT_FAILURE;
             }
+        } else if (std::string(argv[i]) == "--log-dir") {
+            if (i + 1 >= argc) {
+                fprintf(stderr, "error: --log-dir requires a value\n");
+                return EXIT_FAILURE;
+            }
+            log_dir = argv[++i];
         } else if (std::string(argv[i]) == "--freq") {
             if (i + 1 >= argc) {
                 fprintf(stderr, "error: --freq requires a value\n");
@@ -810,6 +913,7 @@ int main(int argc, const char **argv)
         channels[i].label      = freq_label(freqs[i]);
         channels[i].name       = freq_name(freqs[i]);
         channels[i].hub        = &hub;
+        channels[i].log_dir    = log_dir;
 
         fprintf(stderr, "channel %zu     : %s (%s)  dial=%ld Hz\n",
                 i, channels[i].label.c_str(), channels[i].name.c_str(),

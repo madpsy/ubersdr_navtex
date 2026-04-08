@@ -543,6 +543,12 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
   }
 
   function switchTab(ch) {
+    /* Disable any active audio preview when switching tabs */
+    if (window._activeWs) {
+      for (let i = 0; i < NUM_CHANNELS; i++) {
+        if (audioState[i] && audioState[i].enabled) audioDisable(i, window._activeWs);
+      }
+    }
     /* Hide all individual panels and deactivate all buttons */
     for (let i = 0; i < NUM_CHANNELS; i++) {
       const btn   = document.getElementById('tab-btn-' + i);
@@ -796,6 +802,10 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
   }
 
   function audioEnable(ch, ws) {
+    /* Only one channel can preview at a time — disable any other active channel first */
+    for (let i = 0; i < NUM_CHANNELS; i++) {
+      if (i !== ch && audioState[i].enabled) audioDisable(i, ws);
+    }
     const a = audioState[ch];
     if (a.enabled) return;
     a.ctx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: a.sampleRate });
