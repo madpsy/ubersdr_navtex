@@ -55,8 +55,10 @@
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
+#include <functional>
 #include <map>
 #include <mutex>
+#include <set>
 #include <string>
 #include <thread>
 #include <vector>
@@ -466,6 +468,33 @@ struct BroadcastHub {
 };
 
 /* ------------------------------------------------------------------ */
+/* Per-message signal-quality accumulator                               */
+/* ------------------------------------------------------------------ */
+struct MsgMetrics {
+    /* Running sums — accumulated every 100 ms while in_msg == true */
+    double   sum_bb_power      = 0.0;
+    double   sum_noise_density = 0.0;
+    double   sum_signal_conf   = 0.0;
+    uint64_t sum_chars_clean   = 0;
+    uint64_t sum_chars_fec     = 0;
+    uint64_t sum_chars_failed  = 0;
+    int      sample_count      = 0;   /* number of 100 ms ticks accumulated */
+    int      sq_sample_count   = 0;   /* ticks where has_signal_quality was true */
+
+    /* UTC ISO-8601 timestamps */
+    std::string start_utc;   /* set when ZCZC seen */
+    std::string end_utc;     /* set when NNNN seen */
+
+    void reset() {
+        sum_bb_power = sum_noise_density = sum_signal_conf = 0.0;
+        sum_chars_clean = sum_chars_fec = sum_chars_failed = 0;
+        sample_count = sq_sample_count = 0;
+        start_utc.clear();
+        end_utc.clear();
+    }
+};
+
+/* ------------------------------------------------------------------ */
 /* Per-channel context                                                  */
 /* ------------------------------------------------------------------ */
 struct ChannelContext {
@@ -492,6 +521,9 @@ struct ChannelContext {
     PcmMeta              meta;
     std::vector<uint8_t> decomp_buf;
     std::vector<int16_t> pcm_le;
+
+    /* Per-message signal-quality accumulator */
+    MsgMetrics msg_metrics;
 
     /* Raw log — one file per day per frequency, rotated at UTC midnight */
     FILE        *raw_log_file = nullptr;
@@ -583,10 +615,14 @@ static void rotate_raw_log_if_needed(ChannelContext *ctx)
     ctx->raw_log_mday = d;
 }
 
+/* Forward declaration — defined later in the History API section */
+static std::string json_escape(const std::string &s);
+
 /* ------------------------------------------------------------------ */
 /* Message-to-disk logging                                              */
 /* ------------------------------------------------------------------ */
-static void save_message(const ChannelContext &ctx, const MsgParser &mp)
+static void save_message(const ChannelContext &ctx, const MsgParser &mp,
+                         const MsgMetrics &metrics)
 {
     if (ctx.log_dir.empty()) return;
     if (mp.body.empty())     return;
@@ -623,9 +659,9 @@ static void save_message(const ChannelContext &ctx, const MsgParser &mp)
         mkdir(p.c_str(), 0755);
     }
 
-    /* Build filename: <HHMMSS>Z_<station><subject><serial>.txt
+    /* Build filename stem: <HHMMSS>Z_<station><subject><serial>
      * Fall back gracefully if station/subject/serial are missing. */
-    char fname[64];
+    char stem[64];
     char id_part[16] = "unknown";
     if (mp.station && mp.subject) {
         if (mp.serial >= 0)
@@ -635,17 +671,15 @@ static void save_message(const ChannelContext &ctx, const MsgParser &mp)
             snprintf(id_part, sizeof(id_part), "%c%c",
                      mp.station, mp.subject);
     }
-    snprintf(fname, sizeof(fname), "%02d%02d%02dZ_%s.txt",
+    snprintf(stem, sizeof(stem), "%02d%02d%02dZ_%s",
              utc.tm_hour, utc.tm_min, utc.tm_sec, id_part);
 
-    /* Full path */
-    std::string full_path = std::string(date_path) + "/" + fname;
-
-    /* Write message: header line + body */
-    FILE *f = fopen(full_path.c_str(), "w");
+    /* ---- Write .txt message file ---- */
+    std::string txt_path = std::string(date_path) + "/" + stem + ".txt";
+    FILE *f = fopen(txt_path.c_str(), "w");
     if (!f) {
         fprintf(stderr, "[ch%d] save_message: cannot open %s: %s\n",
-                ctx.channel_id, full_path.c_str(), strerror(errno));
+                ctx.channel_id, txt_path.c_str(), strerror(errno));
         return;
     }
 
@@ -661,12 +695,97 @@ static void save_message(const ChannelContext &ctx, const MsgParser &mp)
     fprintf(f, "NNNN\n");
     fclose(f);
 
-    fprintf(stderr, "[ch%d] saved message -> %s\n", ctx.channel_id, full_path.c_str());
+    fprintf(stderr, "[ch%d] saved message -> %s\n", ctx.channel_id, txt_path.c_str());
+
+    /* ---- Write companion .json metrics file ---- */
+    std::string json_path = std::string(date_path) + "/" + stem + ".json";
+    FILE *jf = fopen(json_path.c_str(), "w");
+    if (!jf) {
+        fprintf(stderr, "[ch%d] save_message: cannot open %s: %s\n",
+                ctx.channel_id, json_path.c_str(), strerror(errno));
+        return;
+    }
+
+    /* Compute averages */
+    int n  = metrics.sample_count;
+    int nq = metrics.sq_sample_count;
+
+    /* Duration in seconds */
+    int duration_s = 0;
+    if (!metrics.start_utc.empty() && !metrics.end_utc.empty()) {
+        /* Parse ISO-8601 strings to compute difference (simple approach) */
+        struct tm t0 {}, t1 {};
+        strptime(metrics.start_utc.c_str(), "%Y-%m-%dT%H:%M:%SZ", &t0);
+        strptime(metrics.end_utc.c_str(),   "%Y-%m-%dT%H:%M:%SZ", &t1);
+        time_t e0 = timegm(&t0);
+        time_t e1 = timegm(&t1);
+        if (e1 > e0) duration_s = (int)(e1 - e0);
+    }
+
+    fprintf(jf, "{\n");
+    fprintf(jf, "  \"freq_hz\": %ld,\n",      ctx.carrier_hz);
+    fprintf(jf, "  \"freq_label\": \"%s\",\n", json_escape(ctx.label).c_str());
+    fprintf(jf, "  \"station\": \"%c\",\n",    mp.station ? mp.station : '?');
+    fprintf(jf, "  \"subject\": \"%c\",\n",    mp.subject ? mp.subject : '?');
+    if (mp.serial >= 0)
+        fprintf(jf, "  \"serial\": %d,\n",     mp.serial);
+    else
+        fprintf(jf, "  \"serial\": null,\n");
+    fprintf(jf, "  \"start_utc\": \"%s\",\n",  metrics.start_utc.c_str());
+    fprintf(jf, "  \"end_utc\": \"%s\",\n",    metrics.end_utc.c_str());
+    fprintf(jf, "  \"duration_s\": %d,\n",     duration_s);
+    fprintf(jf, "  \"sample_count\": %d,\n",   n);
+    if (nq > 0) {
+        double avg_bb = metrics.sum_bb_power      / nq;
+        double avg_nd = metrics.sum_noise_density / nq;
+        fprintf(jf, "  \"avg_bb_power_dbfs\": %.2f,\n",      avg_bb);
+        fprintf(jf, "  \"avg_noise_density_dbfs\": %.2f,\n", avg_nd);
+        fprintf(jf, "  \"avg_snr_db\": %.2f,\n",             avg_bb - avg_nd);
+    } else {
+        fprintf(jf, "  \"avg_bb_power_dbfs\": null,\n");
+        fprintf(jf, "  \"avg_noise_density_dbfs\": null,\n");
+        fprintf(jf, "  \"avg_snr_db\": null,\n");
+    }
+    if (n > 0) {
+        double avg_sc = metrics.sum_signal_conf / n;
+        uint64_t total_chars = metrics.sum_chars_clean + metrics.sum_chars_fec + metrics.sum_chars_failed;
+        double clean_pct  = total_chars > 0 ? 100.0 * metrics.sum_chars_clean  / total_chars : 0.0;
+        double fec_pct    = total_chars > 0 ? 100.0 * metrics.sum_chars_fec    / total_chars : 0.0;
+        double failed_pct = total_chars > 0 ? 100.0 * metrics.sum_chars_failed / total_chars : 0.0;
+        fprintf(jf, "  \"avg_signal_confidence\": %.2f,\n",  avg_sc);
+        fprintf(jf, "  \"avg_chars_clean_pct\": %.1f,\n",    clean_pct);
+        fprintf(jf, "  \"avg_chars_fec_pct\": %.1f,\n",      fec_pct);
+        fprintf(jf, "  \"avg_chars_failed_pct\": %.1f\n",    failed_pct);
+    } else {
+        fprintf(jf, "  \"avg_signal_confidence\": null,\n");
+        fprintf(jf, "  \"avg_chars_clean_pct\": null,\n");
+        fprintf(jf, "  \"avg_chars_fec_pct\": null,\n");
+        fprintf(jf, "  \"avg_chars_failed_pct\": null\n");
+    }
+    fprintf(jf, "}\n");
+    fclose(jf);
+
+    fprintf(stderr, "[ch%d] saved metrics  -> %s\n", ctx.channel_id, json_path.c_str());
 }
 
 /* ------------------------------------------------------------------ */
 /* fopencookie write callback — per-channel                             */
 /* ------------------------------------------------------------------ */
+
+/* Return current UTC time as ISO-8601 string: "2026-04-08T14:30:22Z" */
+static std::string utc_iso8601_now()
+{
+    auto now = std::chrono::system_clock::now();
+    std::time_t tt = std::chrono::system_clock::to_time_t(now);
+    struct tm utc {};
+    gmtime_r(&tt, &utc);
+    char buf[64];
+    snprintf(buf, sizeof(buf), "%04d-%02d-%02dT%02d:%02d:%02dZ",
+             utc.tm_year + 1900, utc.tm_mon + 1, utc.tm_mday,
+             utc.tm_hour, utc.tm_min, utc.tm_sec);
+    return std::string(buf);
+}
+
 static ssize_t ws_cookie_write(void *cookie, const char *buf, size_t size)
 {
     auto *ctx = static_cast<ChannelContext *>(cookie);
@@ -706,6 +825,12 @@ static ssize_t ws_cookie_write(void *cookie, const char *buf, size_t size)
                        (ctx->msg_parser.subject   != was_sub) ||
                        (ctx->msg_parser.serial    != was_ser);
         if (changed) {
+            /* Record message start time when ZCZC is first seen */
+            if (ctx->msg_parser.in_msg && !was_in) {
+                ctx->msg_metrics.reset();
+                ctx->msg_metrics.start_utc = utc_iso8601_now();
+            }
+
             ctx->hub->send_msg_info(ctx->channel_id,
                                     ctx->msg_parser.in_msg,
                                     ctx->msg_parser.complete,
@@ -713,8 +838,11 @@ static ssize_t ws_cookie_write(void *cookie, const char *buf, size_t size)
                                     ctx->msg_parser.subject,
                                     ctx->msg_parser.serial);
             /* Save completed message to disk (transition: not-complete -> complete) */
-            if (ctx->msg_parser.complete && !was_cmp)
-                save_message(*ctx, ctx->msg_parser);
+            if (ctx->msg_parser.complete && !was_cmp) {
+                ctx->msg_metrics.end_utc = utc_iso8601_now();
+                save_message(*ctx, ctx->msg_parser, ctx->msg_metrics);
+                ctx->msg_metrics.reset();
+            }
         }
     }
     return (ssize_t)size;
@@ -867,13 +995,28 @@ static void run_channel(ChannelContext *ctx, const std::string &base_url)
                             uint32_t rate = ctx->meta.sample_rate
                                           ? ctx->meta.sample_rate
                                           : (uint32_t)ctx->current_sample_rate;
+                            DecoderStats dec = ctx->decoder->get_stats();
                             ctx->hub->send_stats(ctx->channel_id,
                                                  rate,
                                                  ctx->cached_has_sq,
                                                  ctx->cached_bb_power,
                                                  ctx->cached_noise_den,
                                                  active,
-                                                 ctx->decoder->get_stats());
+                                                 dec);
+
+                            /* Accumulate per-message metrics while a message is in progress */
+                            if (ctx->msg_parser.in_msg) {
+                                ctx->msg_metrics.sample_count++;
+                                ctx->msg_metrics.sum_signal_conf   += dec.signal_confidence;
+                                ctx->msg_metrics.sum_chars_clean   += (uint64_t)dec.chars_clean;
+                                ctx->msg_metrics.sum_chars_fec     += (uint64_t)dec.chars_fec;
+                                ctx->msg_metrics.sum_chars_failed  += (uint64_t)dec.chars_failed;
+                                if (ctx->cached_has_sq) {
+                                    ctx->msg_metrics.sq_sample_count++;
+                                    ctx->msg_metrics.sum_bb_power      += ctx->cached_bb_power;
+                                    ctx->msg_metrics.sum_noise_density += ctx->cached_noise_den;
+                                }
+                            }
                         }
                     }
                 } else {
@@ -938,17 +1081,22 @@ static std::string json_escape(const std::string &s)
 
 /* Recursively walk log_dir and collect .txt message files and .log raw files.
  * Returns a JSON array string, newest-first (sorted by filename path).
- * Each entry has a "type" field: "msg" for .txt files, "raw" for .log files. */
+ * Each entry has a "type" field: "msg" for .txt files, "raw" for .log files.
+ * .json sidecar files are not listed separately — they are referenced via
+ * the "has_metrics" flag on the corresponding "msg" entry. */
 static std::string history_list_json(const std::string &log_dir)
 {
     if (log_dir.empty()) return "[]";
 
-    /* Collect all .txt and .log file paths */
+    /* Collect all .txt and .log file paths (skip .json sidecars — handled below) */
     struct FileEntry {
         std::string full;
         bool is_raw; /* true = .log raw file, false = .txt message file */
     };
     std::vector<FileEntry> files;
+
+    /* Also collect the set of .json sidecar paths for quick lookup */
+    std::set<std::string> json_sidecars;
 
     std::function<void(const std::string &)> walk = [&](const std::string &dir) {
         DIR *d = opendir(dir.c_str());
@@ -968,6 +1116,8 @@ static std::string history_list_json(const std::string &log_dir)
                     files.push_back({full, false});
                 else if (name.size() > 4 && name.substr(name.size()-4) == ".log")
                     files.push_back({full, true});
+                else if (name.size() > 5 && name.substr(name.size()-5) == ".json")
+                    json_sidecars.insert(full);
             }
         }
         closedir(d);
@@ -1054,6 +1204,44 @@ static std::string history_list_json(const std::string &log_dir)
             }
         }
 
+        /* For .txt message files, check whether a .json sidecar exists and
+         * extract the two key summary fields (avg_snr_db, duration_s) for
+         * inline display in the history list. */
+        bool has_metrics = false;
+        std::string json_sidecar_path;
+        std::string inline_snr;      /* e.g. "45.8" or "" */
+        std::string inline_duration; /* e.g. "132"  or "" */
+        if (!fe.is_raw) {
+            json_sidecar_path = fe.full.substr(0, fe.full.size() - 4) + ".json";
+            has_metrics = (json_sidecars.count(json_sidecar_path) > 0);
+
+            if (has_metrics) {
+                /* Read sidecar and extract avg_snr_db and duration_s with
+                 * simple substring searches — no full JSON parser needed. */
+                FILE *sf = fopen(json_sidecar_path.c_str(), "r");
+                if (sf) {
+                    std::string sc;
+                    char sbuf[4096]; size_t sn;
+                    while ((sn = fread(sbuf, 1, sizeof(sbuf), sf)) > 0)
+                        sc.append(sbuf, sn);
+                    fclose(sf);
+
+                    auto extract_num = [&](const std::string &key) -> std::string {
+                        auto p = sc.find("\"" + key + "\":");
+                        if (p == std::string::npos) return "";
+                        p = sc.find_first_not_of(" \t\r\n", p + key.size() + 3);
+                        if (p == std::string::npos) return "";
+                        if (sc[p] == 'n') return ""; /* null */
+                        auto e = sc.find_first_of(",}\n", p);
+                        return (e == std::string::npos) ? sc.substr(p) : sc.substr(p, e - p);
+                    };
+
+                    inline_snr      = extract_num("avg_snr_db");
+                    inline_duration = extract_num("duration_s");
+                }
+            }
+        }
+
         if (!first) json += ",";
         first = false;
         json += "{";
@@ -1063,9 +1251,17 @@ static std::string history_list_json(const std::string &log_dir)
         json += ",\"freq\":\""  + json_escape(freq)      + "\"";
         json += ",\"date\":\""  + json_escape(year + "-" + month + "-" + day) + "\"";
         if (!fe.is_raw) {
-            json += ",\"time\":\""   + json_escape(time_part)   + "\"";
-            json += ",\"id\":\""     + json_escape(id_part)     + "\"";
-            json += ",\"serial\":\"" + json_escape(serial_part) + "\"";
+            json += ",\"time\":\""        + json_escape(time_part)   + "\"";
+            json += ",\"id\":\""          + json_escape(id_part)     + "\"";
+            json += ",\"serial\":\""      + json_escape(serial_part) + "\"";
+            json += ",\"has_metrics\":"   + std::string(has_metrics ? "true" : "false");
+            if (has_metrics) {
+                json += ",\"metrics_path\":\"" + json_escape(json_sidecar_path) + "\"";
+                if (!inline_snr.empty())
+                    json += ",\"snr\":" + inline_snr;
+                if (!inline_duration.empty())
+                    json += ",\"duration_s\":" + inline_duration;
+            }
         }
         json += "}";
     }
@@ -1104,9 +1300,10 @@ static void purge_old_logs(const std::string &log_dir, int retain_days)
                 subdirs.push_back(full);
             else if (S_ISREG(st.st_mode)) {
                 std::string name = ent->d_name;
-                bool is_txt = name.size() > 4 && name.substr(name.size()-4) == ".txt";
-                bool is_log = name.size() > 4 && name.substr(name.size()-4) == ".log";
-                if (is_txt || is_log)
+                bool is_txt  = name.size() > 4 && name.substr(name.size()-4) == ".txt";
+                bool is_log  = name.size() > 4 && name.substr(name.size()-4) == ".log";
+                bool is_json = name.size() > 5 && name.substr(name.size()-5) == ".json";
+                if (is_txt || is_log || is_json)
                     files.push_back(full);
             }
         }
@@ -1182,6 +1379,29 @@ static std::string history_read_file(const std::string &log_dir,
     if (path.find("..") != std::string::npos) return "";
 
     FILE *f = fopen(path.c_str(), "r");
+    if (!f) return "";
+    std::string content;
+    char buf[4096];
+    size_t n;
+    while ((n = fread(buf, 1, sizeof(buf), f)) > 0)
+        content.append(buf, n);
+    fclose(f);
+    return content;
+}
+
+/* Read the .json sidecar for a .txt message file, if it exists.
+ * Returns empty string if not present or on error. */
+static std::string history_read_metrics(const std::string &log_dir,
+                                        const std::string &txt_path)
+{
+    if (log_dir.empty() || txt_path.empty()) return "";
+    if (txt_path.substr(0, log_dir.size()) != log_dir) return "";
+    if (txt_path.find("..") != std::string::npos) return "";
+    /* Must end in .txt */
+    if (txt_path.size() < 5 || txt_path.substr(txt_path.size()-4) != ".txt") return "";
+
+    std::string json_path = txt_path.substr(0, txt_path.size()-4) + ".json";
+    FILE *f = fopen(json_path.c_str(), "r");
     if (!f) return "";
     std::string content;
     char buf[4096];
@@ -1456,6 +1676,31 @@ int main(int argc, const char **argv)
                     resp->statusCode  = 200;
                     resp->description = "OK";
                     resp->headers["Content-Type"] = "text/plain; charset=utf-8";
+                    resp->body = content;
+                }
+                return resp;
+            }
+
+            /* GET /api/history/metrics?path=<absolute-txt-path> — return JSON sidecar */
+            if (path_only == "/api/history/metrics") {
+                std::string file_path;
+                if (qpos != std::string::npos) {
+                    std::string qs = path.substr(qpos + 1);
+                    const std::string key = "path=";
+                    auto kpos = qs.find(key);
+                    if (kpos != std::string::npos)
+                        file_path = url_decode(qs.substr(kpos + key.size()));
+                }
+                std::string content = history_read_metrics(log_dir, file_path);
+                if (content.empty()) {
+                    resp->statusCode  = 404;
+                    resp->description = "Not Found";
+                    resp->headers["Content-Type"] = "application/json";
+                    resp->body = "{}";
+                } else {
+                    resp->statusCode  = 200;
+                    resp->description = "OK";
+                    resp->headers["Content-Type"] = "application/json";
                     resp->body = content;
                 }
                 return resp;

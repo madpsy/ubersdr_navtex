@@ -490,6 +490,23 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
 .hist-table tbody td.hist-id   { color: #c8dff0; font-family: monospace; font-weight: 600; }
 .hist-table tbody td.hist-date { color: #778; }
 .hist-table tbody td.hist-time { color: #778; font-family: monospace; }
+.hist-table tbody td.hist-snr  { font-family: monospace; font-size: 0.8rem; }
+.hist-table tbody td.hist-snr.good { color: #4caf50; }
+.hist-table tbody td.hist-snr.warn { color: #ff9800; }
+.hist-table tbody td.hist-snr.bad  { color: #f44336; }
+.hist-table tbody td.hist-snr.dim  { color: #446; }
+.hist-table tbody td.hist-dur  { font-family: monospace; font-size: 0.8rem; color: #6a8aaa; }
+.hist-pagination {
+  display: flex; align-items: center; justify-content: center;
+  gap: 8px; padding: 10px 0 4px; font-size: 0.82rem; color: #557;
+}
+.hist-pagination button {
+  background: #16213e; border: 1px solid #2a4a7f; border-radius: 3px;
+  color: #a0b8d8; padding: 3px 10px; cursor: pointer; font-size: 0.8rem;
+}
+.hist-pagination button:hover:not(:disabled) { border-color: #53d8fb; color: #53d8fb; }
+.hist-pagination button:disabled { opacity: 0.35; cursor: default; }
+.hist-pagination .hist-page-info { color: #557; min-width: 80px; text-align: center; }
 .hist-view-btn {
   background: #16213e; border: 1px solid #2a4a7f; border-radius: 3px;
   color: #a0b8d8; cursor: pointer; font-size: 0.75rem; padding: 3px 8px;
@@ -505,6 +522,54 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
   white-space: pre-wrap; word-break: break-word;
   background: #0a1628;
 }
+
+/* ---- Message metrics summary panel ---- */
+.msg-metrics-panel {
+  background: #0d1f35;
+  border-bottom: 1px solid #1a3a5c;
+  padding: 12px 20px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px 24px;
+  flex-shrink: 0;
+}
+.msg-metrics-panel.hidden { display: none; }
+.mm-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 90px;
+}
+.mm-label {
+  font-size: 0.58rem;
+  color: #557;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-family: 'Courier New', monospace;
+}
+.mm-value {
+  font-size: 0.82rem;
+  color: #53d8fb;
+  font-family: 'Courier New', monospace;
+}
+.mm-value.good  { color: #4caf50; }
+.mm-value.warn  { color: #ffeb3b; }
+.mm-value.bad   { color: #e94560; }
+.mm-value.dim   { color: #446; }
+.mm-fec-bar {
+  display: flex;
+  height: 5px;
+  border-radius: 3px;
+  overflow: hidden;
+  width: 100%;
+  min-width: 120px;
+  background: #0d0d1a;
+  border: 1px solid #1a3a5c;
+  margin-top: 2px;
+}
+.mm-fec-clean { background: #4caf50; height: 100%; }
+.mm-fec-fec   { background: #ffeb3b; height: 100%; }
+.mm-fec-fail  { background: #e94560; height: 100%; }
 </style>
 </head>
 <body>
@@ -556,6 +621,8 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
             <th>Serial</th>
             <th>Station</th>
             <th>Subject</th>
+            <th>SNR</th>
+            <th>Duration</th>
             <th></th>
           </tr>
         </thead>
@@ -563,6 +630,11 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
       </table>
       <div id="hist-empty" class="hist-empty" style="display:none">No messages found.</div>
       <div id="hist-loading" class="hist-empty">Loading&hellip;</div>
+      <div class="hist-pagination" id="hist-pagination" style="display:none">
+        <button id="hist-prev-btn" onclick="histPagePrev()" disabled>&#8592; Prev</button>
+        <span class="hist-page-info" id="hist-page-info"></span>
+        <button id="hist-next-btn" onclick="histPageNext()">Next &#8594;</button>
+      </div>
     </div>
   </div>
 </div>
@@ -578,6 +650,7 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
         <button class="hist-close" onclick="closeMsgModal()" title="Close">&times;</button>
       </div>
     </div>
+    <div id="msg-metrics-panel" class="msg-metrics-panel hidden"></div>
     <pre id="msg-modal-body" class="msg-modal-body"></pre>
   </div>
 </div>
@@ -1389,6 +1462,7 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
           opt.textContent = f;
           sel.appendChild(opt);
         });
+        _histPage = 0;
         renderHistTable(_histData);
       })
       .catch(function(err) {
@@ -1403,11 +1477,16 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
     if (modal) modal.style.display = 'none';
   }
 
+  /* Pagination state */
+  var _histFiltered = [];
+  var _histPage     = 0;
+  var _HIST_PAGE_SZ = 50;
+
   function filterHistory() {
     const q    = (document.getElementById('hist-search').value || '').toLowerCase();
     const freq = (document.getElementById('hist-freq-filter').value || '');
     const type = (document.getElementById('hist-type-filter').value || '');
-    const filtered = _histData.filter(function(m) {
+    _histFiltered = _histData.filter(function(m) {
       if (type && (m.type || 'msg') !== type) return false;
       if (freq && m.freq !== freq) return false;
       if (q) {
@@ -1420,20 +1499,68 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
       }
       return true;
     });
-    renderHistTable(filtered);
+    _histPage = 0;
+    renderHistTable(_histFiltered);
+  }
+
+  function histPagePrev() {
+    if (_histPage > 0) { _histPage--; renderHistTable(_histFiltered); }
+  }
+  function histPageNext() {
+    const pages = Math.ceil(_histFiltered.length / _HIST_PAGE_SZ);
+    if (_histPage < pages - 1) { _histPage++; renderHistTable(_histFiltered); }
   }
 
   function renderHistTable(rows) {
-    const tbody = document.getElementById('hist-tbody');
-    const empty = document.getElementById('hist-empty');
+    /* Keep a reference for pagination nav */
+    _histFiltered = rows;
+
+    const tbody   = document.getElementById('hist-tbody');
+    const empty   = document.getElementById('hist-empty');
+    const pagDiv  = document.getElementById('hist-pagination');
+    const prevBtn = document.getElementById('hist-prev-btn');
+    const nextBtn = document.getElementById('hist-next-btn');
+    const pageInfo= document.getElementById('hist-page-info');
+
     tbody.innerHTML = '';
+
     if (rows.length === 0) {
       empty.style.display   = 'block';
       empty.textContent     = 'No entries found.';
+      pagDiv.style.display  = 'none';
       return;
     }
     empty.style.display = 'none';
-    rows.forEach(function(m) {
+
+    /* Pagination slice */
+    const totalPages = Math.ceil(rows.length / _HIST_PAGE_SZ);
+    if (_histPage >= totalPages) _histPage = totalPages - 1;
+    const start = _histPage * _HIST_PAGE_SZ;
+    const page  = rows.slice(start, start + _HIST_PAGE_SZ);
+
+    /* Show/hide pagination bar */
+    if (totalPages > 1) {
+      pagDiv.style.display  = 'flex';
+      prevBtn.disabled      = (_histPage === 0);
+      nextBtn.disabled      = (_histPage >= totalPages - 1);
+      pageInfo.textContent  = 'Page ' + (_histPage + 1) + ' / ' + totalPages
+                            + ' (' + rows.length + ' entries)';
+    } else {
+      pagDiv.style.display  = 'none';
+    }
+
+    /* SNR colour helper (matches modal panel thresholds) */
+    function snrCls(snr) {
+      if (snr === null || snr === undefined) return 'dim';
+      return snr > 45 ? 'good' : snr > 35 ? 'warn' : 'bad';
+    }
+    function fmtDur(s) {
+      if (s === null || s === undefined) return '—';
+      const m = Math.floor(s / 60), sec = s % 60;
+      return m > 0 ? m + 'm ' + sec + 's' : sec + 's';
+    }
+
+    page.forEach(function(m) {
       const isRaw = (m.type === 'raw');
       const dec = isRaw ? { station: '—', subject: '—', serial: '—' } : decodeNavtexId(m.id || '');
       const tr = document.createElement('tr');
@@ -1495,6 +1622,22 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
       tdSubject.textContent = isRaw ? '—' : dec.subject;
       tr.appendChild(tdSubject);
 
+      /* SNR — colour-coded, blank for raw logs or missing metrics */
+      const tdSnr = document.createElement('td');
+      tdSnr.className = 'hist-snr' + (isRaw ? ' dim' : ' ' + snrCls(m.snr));
+      if (!isRaw && m.snr !== null && m.snr !== undefined) {
+        tdSnr.textContent = Number(m.snr).toFixed(1) + ' dB';
+      } else {
+        tdSnr.textContent = '—';
+      }
+      tr.appendChild(tdSnr);
+
+      /* Duration */
+      const tdDur = document.createElement('td');
+      tdDur.className = 'hist-dur';
+      tdDur.textContent = isRaw ? '—' : fmtDur(m.duration_s);
+      tr.appendChild(tdDur);
+
       /* View / Download button */
       const tdBtn = document.createElement('td');
       const btn = document.createElement('button');
@@ -1530,27 +1673,131 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
     document.body.removeChild(a);
   }
 
+  /* ---- Metrics panel renderer ---- */
+  function renderMetricsPanel(m) {
+    const panel = document.getElementById('msg-metrics-panel');
+    if (!panel) return;
+    if (!m) { panel.className = 'msg-metrics-panel hidden'; return; }
+
+    function fmt(v, digits) {
+      return (v === null || v === undefined) ? '\u2014' : Number(v).toFixed(digits !== undefined ? digits : 1);
+    }
+    function fmtPct(v) { return (v === null || v === undefined) ? '\u2014' : Number(v).toFixed(1) + '%'; }
+    function snrClass(snr) {
+      if (snr === null || snr === undefined) return '';
+      return snr > 45 ? 'good' : snr > 35 ? 'warn' : 'bad';
+    }
+    function fecClass(pct) {
+      if (pct === null || pct === undefined) return '';
+      return pct > 30 ? 'warn' : 'good';
+    }
+    function errClass(pct) {
+      if (pct === null || pct === undefined) return '';
+      return pct > 10 ? 'bad' : pct > 3 ? 'warn' : 'good';
+    }
+
+    /* Format UTC timestamps nicely */
+    function fmtUtc(iso) {
+      if (!iso) return '\u2014';
+      return iso.replace('T', ' ').replace('Z', ' UTC');
+    }
+    function fmtDuration(s) {
+      if (s === null || s === undefined) return '\u2014';
+      const m = Math.floor(s / 60), sec = s % 60;
+      return m > 0 ? m + 'm ' + sec + 's' : sec + 's';
+    }
+
+    /* Build FEC quality bar */
+    const cleanPct  = m.avg_chars_clean_pct  || 0;
+    const fecPct    = m.avg_chars_fec_pct    || 0;
+    const failPct   = m.avg_chars_failed_pct || 0;
+
+    panel.innerHTML =
+      '<div class="mm-item">'
+        + '<span class="mm-label">Start (UTC)</span>'
+        + '<span class="mm-value">' + fmtUtc(m.start_utc) + '</span>'
+      + '</div>'
+      + '<div class="mm-item">'
+        + '<span class="mm-label">End (UTC)</span>'
+        + '<span class="mm-value">' + fmtUtc(m.end_utc) + '</span>'
+      + '</div>'
+      + '<div class="mm-item">'
+        + '<span class="mm-label">Duration</span>'
+        + '<span class="mm-value">' + fmtDuration(m.duration_s) + '</span>'
+      + '</div>'
+      + (m.avg_snr_db !== null && m.avg_snr_db !== undefined
+        ? '<div class="mm-item">'
+            + '<span class="mm-label">Avg SNR</span>'
+            + '<span class="mm-value ' + snrClass(m.avg_snr_db) + '">' + fmt(m.avg_snr_db, 1) + ' dB</span>'
+          + '</div>'
+        : '')
+      + (m.avg_bb_power_dbfs !== null && m.avg_bb_power_dbfs !== undefined
+        ? '<div class="mm-item">'
+            + '<span class="mm-label">Avg Signal</span>'
+            + '<span class="mm-value">' + fmt(m.avg_bb_power_dbfs, 1) + ' dBFS</span>'
+          + '</div>'
+        : '')
+      + (m.avg_noise_density_dbfs !== null && m.avg_noise_density_dbfs !== undefined
+        ? '<div class="mm-item">'
+            + '<span class="mm-label">Avg Noise</span>'
+            + '<span class="mm-value">' + fmt(m.avg_noise_density_dbfs, 1) + ' dBFS/Hz</span>'
+          + '</div>'
+        : '')
+      + (m.avg_chars_clean_pct !== null && m.avg_chars_clean_pct !== undefined
+        ? '<div class="mm-item" style="min-width:160px">'
+            + '<span class="mm-label">Decode Quality (clean / fec / err)</span>'
+            + '<span class="mm-value">'
+              + '<span class="' + '' + '">' + fmtPct(cleanPct) + '</span>'
+              + ' / <span class="' + fecClass(fecPct) + '">' + fmtPct(fecPct) + '</span>'
+              + ' / <span class="' + errClass(failPct) + '">' + fmtPct(failPct) + '</span>'
+            + '</span>'
+            + '<div class="mm-fec-bar">'
+              + '<div class="mm-fec-clean" style="width:' + cleanPct.toFixed(1) + '%"></div>'
+              + '<div class="mm-fec-fec"   style="width:' + fecPct.toFixed(1)   + '%"></div>'
+              + '<div class="mm-fec-fail"  style="width:' + failPct.toFixed(1)  + '%"></div>'
+            + '</div>'
+          + '</div>'
+        : '')
+      + '<div class="mm-item">'
+        + '<span class="mm-label">Samples</span>'
+        + '<span class="mm-value dim">' + (m.sample_count || '\u2014') + '</span>'
+      + '</div>';
+
+    panel.className = 'msg-metrics-panel';
+  }
+
   function viewMessage(path, title) {
     const modal   = document.getElementById('msg-modal');
     const body    = document.getElementById('msg-modal-body');
     const ttl     = document.getElementById('msg-modal-title');
     const copyBtn = document.getElementById('msg-modal-copy-btn');
     const dlBtn   = document.getElementById('msg-modal-dl-btn');
+    const panel   = document.getElementById('msg-metrics-panel');
     if (!modal || !body) return;
     ttl.textContent  = title || 'Message';
     body.textContent = 'Loading\u2026';
+    if (panel) panel.className = 'msg-metrics-panel hidden';
     /* Reset button state while loading */
     if (copyBtn) { copyBtn.onclick = null; copyBtn.style.opacity = '0.4'; }
     if (dlBtn)   { dlBtn.onclick   = null; dlBtn.style.opacity   = '0.4'; }
     modal.style.display = 'flex';
     const base = (window._BASE_PATH || '').replace(/\/$/, '');
-    fetch(base + '/api/history/file?path=' + encodeURIComponent(path))
-      .then(function(r) {
-        if (!r.ok) throw new Error('HTTP ' + r.status);
-        return r.text();
-      })
-      .then(function(text) {
+
+    /* Fetch message text and metrics sidecar in parallel */
+    const textPromise    = fetch(base + '/api/history/file?path='    + encodeURIComponent(path))
+      .then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); });
+    const metricsPromise = fetch(base + '/api/history/metrics?path=' + encodeURIComponent(path))
+      .then(function(r) { return r.ok ? r.json() : null; })
+      .catch(function()  { return null; });
+
+    Promise.all([textPromise, metricsPromise])
+      .then(function(results) {
+        const text    = results[0];
+        const metrics = results[1];
+
         body.textContent = text;
+        renderMetricsPanel(metrics);
+
         /* Derive a download filename from the path (last component) */
         const fname = path.split('/').pop() || 'navtex-message.txt';
         /* Wire copy button */
@@ -1582,6 +1829,7 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
       })
       .catch(function(err) {
         body.textContent = 'Error loading message: ' + err;
+        if (panel) panel.className = 'msg-metrics-panel hidden';
         if (copyBtn) copyBtn.style.opacity = '0.4';
         if (dlBtn)   dlBtn.style.opacity   = '0.4';
       });
