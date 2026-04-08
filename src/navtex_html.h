@@ -402,14 +402,14 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
   const STATE_CLASS = ['dim', 'warn', 'good'];
   const TAB_DOT_CLASS = ['searching', 'syncing', 'locked'];
 
-  /* Per-channel debounce timers for decoder state display */
-  const decStateTimer  = Array(NUM_CHANNELS).fill(null);
-  const decStatePending = Array(NUM_CHANNELS).fill(null);
-
   const NUM_CHANNELS = )HTML" + std::to_string(channels.size()) + R"HTML(;
 
   /* Per-channel first-char flag */
   const firstChar = Array(NUM_CHANNELS).fill(true);
+
+  /* Per-channel debounce timers for decoder state display */
+  const decStateTimer   = Array(NUM_CHANNELS).fill(null);
+  const decStatePending = Array(NUM_CHANNELS).fill(null);
 
   /* ---- Tab switching ---- */
   let activeTab = 0;
