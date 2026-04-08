@@ -1416,7 +1416,10 @@ static std::string safe_resolve(const std::string &log_dir,
 static std::string history_read_file(const std::string &log_dir,
                                      const std::string &rel)
 {
+    /* Accept .txt message files and .log raw log files; reject everything else */
     std::string resolved = safe_resolve(log_dir, rel, ".txt");
+    if (resolved.empty())
+        resolved = safe_resolve(log_dir, rel, ".log");
     if (resolved.empty()) return "";
 
     FILE *f = fopen(resolved.c_str(), "r");
