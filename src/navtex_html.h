@@ -434,7 +434,7 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
   display: flex;
   flex-direction: column;
   width: 100%;
-  max-width: 860px;
+  max-width: 1060px;
   max-height: 85vh;
   box-shadow: 0 8px 40px rgba(0,0,0,0.7);
   overflow: hidden;
@@ -1583,7 +1583,7 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
       } else {
         const t = (m.time || '').replace(/Z$/i, '');
         tdTime.textContent = t.length === 6
-          ? t.slice(0,2) + ':' + t.slice(2,4) + ':' + t.slice(4,6) + ' UTC'
+          ? t.slice(0,2) + ':' + t.slice(2,4) + ':' + t.slice(4,6)
           : (m.time || '—');
       }
       tr.appendChild(tdTime);
