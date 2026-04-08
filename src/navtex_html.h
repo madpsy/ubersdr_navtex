@@ -625,8 +625,9 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
   const firstChar = Array(NUM_CHANNELS).fill(true);
 
   /* Per-channel debounce timers for decoder state display */
-  const decStateTimer   = Array(NUM_CHANNELS).fill(null);
-  const decStatePending = Array(NUM_CHANNELS).fill(null);
+  const decStateTimer     = Array(NUM_CHANNELS).fill(null);
+  const decStatePending   = Array(NUM_CHANNELS).fill(null);
+  const decStateCommitted = Array(NUM_CHANNELS).fill(null); /* last value shown in UI */
 
   /* ---- Tab switching ---- */
   let activeTab = 'both';
@@ -849,6 +850,7 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
 
   /* ---- Stats update ---- */
   function updateStats(ch, s) {
+    if (ch < 0 || ch >= NUM_CHANNELS) return;
     const bbEl     = chEl('bb-val',   ch);
     const ndEl     = chEl('nd-val',   ch);
     const rateEl   = chEl('rate-val', ch);
@@ -864,6 +866,8 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
     const fecFec   = chEl('fec-fec',  ch);
     const fecFail  = chEl('fec-fail', ch);
     const tabDot   = chEl('tab-dot',  ch);
+    /* Guard: if core elements are missing, bail out */
+    if (!bbEl || !rateEl || !decState) return;
 
     if (s.bb !== undefined) {
       if (isFinite(s.bb)) {
@@ -899,29 +903,32 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
     }
 
     if (s.decState !== undefined) {
-      /* Debounce: only commit the new state after it has been stable for 1 s */
-      decStatePending[ch] = s.decState;
-      if (decStateTimer[ch] !== null) clearTimeout(decStateTimer[ch]);
-      decStateTimer[ch] = setTimeout(function() {
-        decStateTimer[ch] = null;
-        const st   = decStatePending[ch];
-        const name = STATE_NAMES[st] || '?';
-        const cls  = STATE_CLASS[st] || '';
-        decState.textContent = name;
-        decState.className = 'stat-value ' + cls;
-        if (tabDot) {
-          tabDot.className = 'tab-dot ' + (TAB_DOT_CLASS[st] || '');
-        }
-        /* Sync split-clone dot if split panel is built */
-        const splitDot = document.getElementById('split-dot-' + ch);
-        if (splitDot) splitDot.className = tabDot ? tabDot.className : 'tab-dot';
-        /* Sync split-clone dec-state text */
-        const splitDecState = document.getElementById('dec-state-' + ch + '-s');
-        if (splitDecState) {
-          splitDecState.textContent = name;
-          splitDecState.className   = 'stat-value ' + cls;
-        }
-      }, 1000);
+      const newState = s.decState;
+      /* Only (re)start the debounce timer when the incoming state differs from
+       * what is already pending.  This means a stable state fires the timer
+       * exactly once (after 1 s of stability) rather than being perpetually
+       * reset by the 100 ms stats stream. */
+      if (newState !== decStatePending[ch]) {
+        decStatePending[ch] = newState;
+        if (decStateTimer[ch] !== null) { clearTimeout(decStateTimer[ch]); decStateTimer[ch] = null; }
+        decStateTimer[ch] = setTimeout(function() {
+          decStateTimer[ch] = null;
+          const st   = decStatePending[ch];
+          decStateCommitted[ch] = st;
+          const name = STATE_NAMES[st] !== undefined ? STATE_NAMES[st] : '?';
+          const cls  = STATE_CLASS[st]  !== undefined ? STATE_CLASS[st]  : '';
+          const dsEl = chEl('dec-state', ch);
+          const tdEl = chEl('tab-dot',   ch);
+          if (dsEl) { dsEl.textContent = name; dsEl.className = 'stat-value ' + cls; }
+          if (tdEl) { tdEl.className = 'tab-dot ' + (TAB_DOT_CLASS[st] || ''); }
+          const splitDot = document.getElementById('split-dot-' + ch);
+          if (splitDot) splitDot.className = tdEl ? tdEl.className : 'tab-dot';
+          const splitDecState = document.getElementById('dec-state-' + ch + '-s');
+          if (splitDecState) { splitDecState.textContent = name; splitDecState.className = 'stat-value ' + cls; }
+        }, 1000);
+      }
+      /* If newState === decStatePending[ch], the timer is already running and
+       * will fire after 1 s of stability — do nothing. */
     }
 
     if (s.decState === 2 && s.total > 0) {
@@ -947,7 +954,8 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
 
   /* ---- Message info update ---- */
   function updateMsgInfo(ch, inMsg, done, sta, sub, ser) {
-    const prev = prevMsgState[ch];
+    if (ch < 0 || ch >= NUM_CHANNELS) return;
+    const prev = prevMsgState[ch] || { inMsg: false, done: false };
 
     /* Detect message start: transition to inMsg=true */
     if (inMsg && !prev.inMsg && !prev.done) {
@@ -967,6 +975,7 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
     const station = chEl('msg-station',ch);
     const subject = chEl('msg-subject',ch);
     const serial  = chEl('msg-serial', ch);
+    if (!msgBar || !dot || !statTxt || !station || !subject || !serial) return;
 
     if (inMsg || done) {
       msgBar.className = 'msg-bar';
@@ -974,8 +983,9 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
       else      { dot.className = 'msg-dot receiving'; statTxt.textContent = 'Receiving\u2026'; }
       station.textContent = sta ? String.fromCharCode(sta) : '\u2014';
       const subCh = sub ? String.fromCharCode(sub) : '';
+      const subName = subCh ? (SUBJECT[subCh] || '') : '';
       subject.textContent = subCh
-        ? (subCh + (SUBJECT[subCh] ? ' \u2013 ' + SUBJECT[subCh] : ''))
+        ? (subCh + (subName ? ' \u2013 ' + subName : ''))
         : '\u2014';
       serial.textContent = (ser !== 0xFF) ? String(ser).padStart(2, '0') : '\u2014';
     } else {
@@ -1310,7 +1320,8 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
     out.scrollTop = out.scrollHeight;
   }
 
-  /* Extract plain text from output for copy/download — strips timestamps and dividers */
+  /* Extract plain text from output for copy/download.
+   * Dividers are always stripped. Timestamps are included when the toggle is on. */
   function getOutputText(ch) {
     const lines = rawLines[ch];
     if (!lines || lines.length === 0) {
@@ -1318,9 +1329,16 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
       const out = chEl('output', ch);
       return out ? (out.innerText || out.textContent || '') : '';
     }
+    const tsEnabled = document.getElementById('ts-toggle') && document.getElementById('ts-toggle').checked;
     return lines
       .filter(function(e) { return !e.divider; })
-      .map(function(e) { return e.text; })
+      .map(function(e) {
+        if (tsEnabled && e.stamp && e.text && e.text.trim().length > 0) {
+          /* Prepend timestamp only to non-empty lines */
+          return e.stamp + ' ' + e.text;
+        }
+        return e.text;
+      })
       .join('');
   }
 
