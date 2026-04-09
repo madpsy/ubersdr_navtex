@@ -1938,6 +1938,10 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
           + '</div>'
         : '')
       + '<div class="mm-item">'
+        + '<span class="mm-label">Char Count</span>'
+        + '<span class="mm-value">' + (m.char_count !== null && m.char_count !== undefined ? m.char_count : '\u2014') + '</span>'
+      + '</div>'
+      + '<div class="mm-item">'
         + '<span class="mm-label">Samples</span>'
         + '<span class="mm-value dim">' + (m.sample_count || '\u2014') + '</span>'
       + '</div>';

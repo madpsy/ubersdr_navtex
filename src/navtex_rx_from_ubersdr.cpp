@@ -775,13 +775,14 @@ static void save_message(const ChannelContext &ctx, const MsgParser &mp,
         fprintf(jf, "  \"avg_signal_confidence\": %.2f,\n",  avg_sc);
         fprintf(jf, "  \"avg_chars_clean_pct\": %.1f,\n",    clean_pct);
         fprintf(jf, "  \"avg_chars_fec_pct\": %.1f,\n",      fec_pct);
-        fprintf(jf, "  \"avg_chars_failed_pct\": %.1f\n",    failed_pct);
+        fprintf(jf, "  \"avg_chars_failed_pct\": %.1f,\n",   failed_pct);
     } else {
         fprintf(jf, "  \"avg_signal_confidence\": null,\n");
         fprintf(jf, "  \"avg_chars_clean_pct\": null,\n");
         fprintf(jf, "  \"avg_chars_fec_pct\": null,\n");
-        fprintf(jf, "  \"avg_chars_failed_pct\": null\n");
+        fprintf(jf, "  \"avg_chars_failed_pct\": null,\n");
     }
+    fprintf(jf, "  \"char_count\": %zu\n", mp.body.size());
     fprintf(jf, "}\n");
     fclose(jf);
 
