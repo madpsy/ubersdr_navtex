@@ -598,7 +598,7 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
   display: flex;
   flex-direction: column;
   width: 100%;
-  max-width: 900px;
+  max-width: 1200px;
   max-height: 85vh;
   box-shadow: 0 8px 40px rgba(0,0,0,0.7);
   overflow: hidden;
@@ -618,47 +618,59 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
   letter-spacing: 1px;
   margin-bottom: 10px;
 }
-.metrics-chart {
-  display: flex;
-  align-items: flex-end;
-  gap: 3px;
-  height: 120px;
-  overflow-x: auto;
-  padding-bottom: 22px;
-  position: relative;
-}
-.metrics-col {
+/* Chart wrapper: bars on top, labels row below */
+.metrics-chart-wrap {
   display: flex;
   flex-direction: column;
-  align-items: center;
+}
+.metrics-bars-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 110px;
+}
+.metrics-labels-row {
+  display: flex;
+  gap: 2px;
+  margin-top: 4px;
+}
+.metrics-col-bars {
+  display: flex;
+  align-items: flex-end;
   gap: 1px;
-  flex-shrink: 0;
+  flex: 1;
+  min-width: 0;
+}
+.metrics-col-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-align: center;
 }
 .metrics-bar-group {
   display: flex;
   align-items: flex-end;
   gap: 1px;
+  width: 100%;
 }
 .metrics-bar {
-  width: 10px;
+  flex: 1;
+  min-width: 3px;
   min-height: 1px;
   border-radius: 2px 2px 0 0;
-  transition: height 0.3s;
 }
 .metrics-bar.freq-0 { background: #53d8fb; }
 .metrics-bar.freq-1 { background: #ffeb3b; }
 .metrics-bar.freq-2 { background: #4caf50; }
 .metrics-bar.freq-3 { background: #e94560; }
 .metrics-label {
-  font-size: 0.52rem;
-  color: #446;
-  text-align: center;
-  margin-top: 3px;
+  font-size: 0.55rem;
+  color: #c8dff0;
   white-space: nowrap;
-  transform: rotate(-45deg);
-  transform-origin: top left;
-  width: 28px;
   overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+  text-align: center;
 }
 .metrics-legend {
   display: flex;
@@ -2038,19 +2050,28 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
       return html + '</div>';
     }
 
-    function buildChart(buckets, maxVal, labelEvery) {
-      var html = '<div class="metrics-chart">';
-      buckets.forEach(function(b, bi) {
-        html += '<div class="metrics-col"><div class="metrics-bar-group">';
+    function buildChart(buckets, maxVal) {
+      /* Bars row */
+      var barsHtml = '<div class="metrics-bars-row">';
+      buckets.forEach(function(b) {
+        barsHtml += '<div class="metrics-col-bars"><div class="metrics-bar-group">';
         (b.counts || []).forEach(function(c, fi) {
           var h = maxVal > 0 ? Math.round(c / maxVal * 100) : 0;
-          html += '<div class="metrics-bar freq-' + fi + '" style="height:' + h + 'px" title="' + b.label + ': ' + c + '"></div>';
+          barsHtml += '<div class="metrics-bar freq-' + fi
+                    + '" style="height:' + h + 'px" title="' + b.label + ': ' + c + '"></div>';
         });
-        /* Show label every N columns to avoid crowding */
-        var lbl = (labelEvery <= 1 || bi % labelEvery === 0) ? b.label : '';
-        html += '</div><div class="metrics-label">' + lbl + '</div></div>';
+        barsHtml += '</div></div>';
       });
-      return html + '</div>';
+      barsHtml += '</div>';
+
+      /* Labels row — one cell per bucket, same flex proportions */
+      var labelsHtml = '<div class="metrics-labels-row">';
+      buckets.forEach(function(b) {
+        labelsHtml += '<div class="metrics-col-label"><span class="metrics-label">' + b.label + '</span></div>';
+      });
+      labelsHtml += '</div>';
+
+      return '<div class="metrics-chart-wrap">' + barsHtml + labelsHtml + '</div>';
     }
 
     var maxH = maxCount(hours);
@@ -2060,11 +2081,11 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
       buildLegend(freqs)
       + '<div>'
         + '<div class="metrics-section-title">Messages per hour &mdash; last 24 hours</div>'
-        + buildChart(hours, maxH, 2)
+        + buildChart(hours, maxH)
       + '</div>'
       + '<div>'
         + '<div class="metrics-section-title">Messages per day &mdash; last 30 days</div>'
-        + buildChart(days, maxD, 3)
+        + buildChart(days, maxD)
       + '</div>';
   }
 
