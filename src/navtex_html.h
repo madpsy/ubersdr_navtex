@@ -74,7 +74,7 @@ static std::string make_html_page(const std::string &sdr_url,
                    "<span class=\"stat-value\" id=\"err-val-" + s + "\">&mdash;</span></div>\n"
             "      <div class=\"stat\"><span class=\"stat-label\">Decoding</span>"
                    "<span class=\"stat-value\">"
-                   "<span class=\"act-dot\" id=\"act-dot-" + s + "\"></span>"
+                   "<span class=\"act-dot idle\" id=\"act-dot-" + s + "\"></span>"
                    "<span id=\"act-text-" + s + "\">Idle</span></span></div>\n"
             "      <div class=\"stat\"><span class=\"stat-label\">SNR (dB)</span>"
                    "<span class=\"stat-value\" id=\"snr-val-" + s + "\">&mdash;</span></div>\n"
