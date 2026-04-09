@@ -2073,7 +2073,7 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
       return html + '</div>';
     }
 
-    function buildChart(buckets, maxVal, fmtLabel) {
+    function buildChart(buckets, maxVal, fmtLabel, freqs) {
       /* Y-axis: max, mid, 0 */
       var mid = maxVal > 0 ? Math.round(maxVal / 2) : 0;
       var yaxisHtml = '<div class="metrics-yaxis">'
@@ -2088,8 +2088,10 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
         barsHtml += '<div class="metrics-col-bars"><div class="metrics-bar-group">';
         (b.counts || []).forEach(function(c, fi) {
           var h = maxVal > 0 ? Math.round(c / maxVal * 100) : 0;
+          var freqName = (freqs && freqs[fi]) ? freqs[fi] : ('Freq ' + fi);
+          var tip = freqName + '\n' + b.label + ': ' + c;
           barsHtml += '<div class="metrics-bar freq-' + fi
-                    + '" style="height:' + h + 'px" title="' + b.label + ': ' + c + '"></div>';
+                    + '" style="height:' + h + 'px" title="' + tip + '"></div>';
         });
         barsHtml += '</div></div>';
       });
@@ -2120,11 +2122,11 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
       buildLegend(freqs)
       + '<div>'
         + '<div class="metrics-section-title">Messages per hour &mdash; last 24 hours</div>'
-        + buildChart(hours, maxH, null)
+        + buildChart(hours, maxH, null, freqs)
       + '</div>'
       + '<div>'
         + '<div class="metrics-section-title">Messages per day &mdash; last 30 days</div>'
-        + buildChart(days, maxD, fmtDayLabel)
+        + buildChart(days, maxD, fmtDayLabel, freqs)
       + '</div>';
   }
 
