@@ -1099,6 +1099,207 @@ static std::string json_escape(const std::string &s)
     return out;
 }
 
+/* Walk log_dir and compute per-frequency message counts for the last 24 hours
+ * (bucketed by UTC hour) and last 30 days (bucketed by UTC date).
+ * Returns a JSON object:
+ * {
+ *   "freqs": ["518kHz","490kHz",...],
+ *   "hours": [                        // 24 entries, index 0 = oldest hour
+ *     {"label":"HH:00","counts":[n,n,...]}, ...
+ *   ],
+ *   "days": [                         // 30 entries, index 0 = oldest day
+ *     {"label":"YYYY-MM-DD","counts":[n,n,...]}, ...
+ *   ]
+ * }
+ */
+static std::string metrics_json(const std::string &log_dir)
+{
+    if (log_dir.empty()) return "{}";
+
+    /* Collect all .txt message file paths */
+    std::vector<std::string> txt_files;
+    std::function<void(const std::string &)> walk = [&](const std::string &dir) {
+        DIR *d = opendir(dir.c_str());
+        if (!d) return;
+        struct dirent *ent;
+        std::vector<std::string> subdirs;
+        while ((ent = readdir(d)) != nullptr) {
+            if (ent->d_name[0] == '.') continue;
+            std::string full = dir + "/" + ent->d_name;
+            struct stat st {};
+            if (stat(full.c_str(), &st) != 0) continue;
+            if (S_ISDIR(st.st_mode)) {
+                subdirs.push_back(full);
+            } else if (S_ISREG(st.st_mode)) {
+                std::string name = ent->d_name;
+                if (name.size() > 4 && name.substr(name.size()-4) == ".txt")
+                    txt_files.push_back(full);
+            }
+        }
+        closedir(d);
+        for (const auto &sub : subdirs) walk(sub);
+    };
+    walk(log_dir);
+
+    /* Get current UTC time */
+    time_t now = time(nullptr);
+    struct tm now_tm {};
+    gmtime_r(&now, &now_tm);
+
+    /* Build ordered list of unique frequencies (from directory names) */
+    std::vector<std::string> freqs;
+    std::map<std::string, int> freq_idx;
+
+    /* Bucket structures: 24 hours (index 0 = 23 hours ago) and 30 days (index 0 = 29 days ago) */
+    /* We'll fill these after we know all freqs */
+    /* First pass: collect freq names and parse timestamps */
+    struct MsgEntry {
+        std::string freq;
+        int year, mon, mday, hour;
+    };
+    std::vector<MsgEntry> entries;
+
+    for (const auto &full : txt_files) {
+        /* rel path from log_dir */
+        std::string rel = full;
+        if (rel.substr(0, log_dir.size()) == log_dir)
+            rel = rel.substr(log_dir.size());
+        if (!rel.empty() && rel[0] == '/') rel = rel.substr(1);
+
+        /* Expected: <freq>/<YYYY>/<MM>/<DD>/<HHMMSSZ_id>.txt */
+        size_t p = 0;
+        auto tok = [&]() -> std::string {
+            size_t q = rel.find('/', p);
+            std::string t = (q == std::string::npos) ? rel.substr(p) : rel.substr(p, q-p);
+            p = (q == std::string::npos) ? rel.size() : q+1;
+            return t;
+        };
+        std::string freq  = tok();
+        std::string syear = tok();
+        std::string smon  = tok();
+        std::string sday  = tok();
+        std::string fname = tok();
+
+        if (freq.empty() || syear.size() != 4 || smon.size() != 2 || sday.size() != 2)
+            continue;
+        /* fname: HHMMSSZ_id.txt — extract HH */
+        if (fname.size() < 2) continue;
+        int hour = -1;
+        if (fname[0] >= '0' && fname[0] <= '9' && fname[1] >= '0' && fname[1] <= '9')
+            hour = (fname[0]-'0')*10 + (fname[1]-'0');
+        if (hour < 0 || hour > 23) continue;
+
+        int year = atoi(syear.c_str());
+        int mon  = atoi(smon.c_str());
+        int mday = atoi(sday.c_str());
+
+        if (freq_idx.find(freq) == freq_idx.end()) {
+            freq_idx[freq] = (int)freqs.size();
+            freqs.push_back(freq);
+        }
+        entries.push_back({freq, year, mon, mday, hour});
+    }
+
+    int nf = (int)freqs.size();
+
+    /* Hour buckets: last 24 complete hours + current partial hour = 24 slots.
+     * Slot i corresponds to (now - (23-i) hours), truncated to the hour. */
+    struct HourBucket { char label[8]; std::vector<int> counts; };
+    std::vector<HourBucket> hours(24);
+    for (int i = 0; i < 24; i++) {
+        time_t t = now - (time_t)(23 - i) * 3600;
+        struct tm tm2 {};
+        gmtime_r(&t, &tm2);
+        snprintf(hours[i].label, sizeof(hours[i].label), "%02d:00", tm2.tm_hour);
+        hours[i].counts.assign(nf, 0);
+    }
+
+    /* Day buckets: last 30 days (index 0 = 29 days ago) */
+    struct DayBucket { char label[16]; std::vector<int> counts; };
+    std::vector<DayBucket> days(30);
+    for (int i = 0; i < 30; i++) {
+        time_t t = now - (time_t)(29 - i) * 86400;
+        struct tm tm2 {};
+        gmtime_r(&t, &tm2);
+        snprintf(days[i].label, sizeof(days[i].label), "%04d-%02d-%02d",
+                 tm2.tm_year+1900, tm2.tm_mon+1, tm2.tm_mday);
+        days[i].counts.assign(nf, 0);
+    }
+
+    /* Fill buckets */
+    for (const auto &e : entries) {
+        int fi = freq_idx[e.freq];
+
+        /* Convert entry timestamp to time_t for comparison */
+        struct tm etm {};
+        etm.tm_year = e.year - 1900;
+        etm.tm_mon  = e.mon  - 1;
+        etm.tm_mday = e.mday;
+        etm.tm_hour = e.hour;
+        etm.tm_min  = 0;
+        etm.tm_sec  = 0;
+        time_t et = timegm(&etm);
+
+        /* Hour bucket */
+        double diff_h = difftime(now, et) / 3600.0;
+        if (diff_h >= 0.0 && diff_h < 24.0) {
+            int slot = 23 - (int)diff_h;
+            if (slot >= 0 && slot < 24) hours[slot].counts[fi]++;
+        }
+
+        /* Day bucket */
+        double diff_d = difftime(now, et) / 86400.0;
+        if (diff_d >= 0.0 && diff_d < 30.0) {
+            int slot = 29 - (int)diff_d;
+            if (slot >= 0 && slot < 30) days[slot].counts[fi]++;
+        }
+    }
+
+    /* Build JSON */
+    std::string j = "{";
+
+    /* freqs array */
+    j += "\"freqs\":[";
+    for (int i = 0; i < nf; i++) {
+        if (i) j += ",";
+        j += "\"" + json_escape(freqs[i]) + "\"";
+    }
+    j += "]";
+
+    /* hours array */
+    j += ",\"hours\":[";
+    for (int i = 0; i < 24; i++) {
+        if (i) j += ",";
+        j += "{\"label\":\"";
+        j += hours[i].label;
+        j += "\",\"counts\":[";
+        for (int f = 0; f < nf; f++) {
+            if (f) j += ",";
+            j += std::to_string(hours[i].counts[f]);
+        }
+        j += "]}";
+    }
+    j += "]";
+
+    /* days array */
+    j += ",\"days\":[";
+    for (int i = 0; i < 30; i++) {
+        if (i) j += ",";
+        j += "{\"label\":\"";
+        j += days[i].label;
+        j += "\",\"counts\":[";
+        for (int f = 0; f < nf; f++) {
+            if (f) j += ",";
+            j += std::to_string(days[i].counts[f]);
+        }
+        j += "]}";
+    }
+    j += "]";
+
+    j += "}";
+    return j;
+}
+
 /* Recursively walk log_dir and collect .txt message files and .log raw files.
  * Returns a JSON array string, newest-first (sorted by filename path).
  * Each entry has a "type" field: "msg" for .txt files, "raw" for .log files.
@@ -1720,6 +1921,15 @@ int main(int argc, const char **argv)
 
             auto resp = std::make_shared<ix::HttpResponse>();
             resp->headers["Access-Control-Allow-Origin"] = "*";
+
+            /* GET /api/metrics — per-frequency message counts (last 24h by hour, last 30d by day) */
+            if (path_only == "/api/metrics") {
+                resp->statusCode  = 200;
+                resp->description = "OK";
+                resp->headers["Content-Type"] = "application/json";
+                resp->body = metrics_json(log_dir);
+                return resp;
+            }
 
             /* GET /api/history — return JSON list of saved messages */
             if (path_only == "/api/history") {

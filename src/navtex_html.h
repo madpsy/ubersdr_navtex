@@ -589,6 +589,98 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
 .mm-fec-clean { background: #4caf50; height: 100%; }
 .mm-fec-fec   { background: #ffeb3b; height: 100%; }
 .mm-fec-fail  { background: #e94560; height: 100%; }
+
+/* ---- Metrics modal ---- */
+.metrics-dialog {
+  background: #0d1b2a;
+  border: 1px solid #1a3a5c;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 900px;
+  max-height: 85vh;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.7);
+  overflow: hidden;
+}
+.metrics-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+.metrics-section-title {
+  font-size: 0.72rem;
+  color: #557;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 10px;
+}
+.metrics-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 120px;
+  overflow-x: auto;
+  padding-bottom: 22px;
+  position: relative;
+}
+.metrics-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  flex-shrink: 0;
+}
+.metrics-bar-group {
+  display: flex;
+  align-items: flex-end;
+  gap: 1px;
+}
+.metrics-bar {
+  width: 10px;
+  min-height: 1px;
+  border-radius: 2px 2px 0 0;
+  transition: height 0.3s;
+}
+.metrics-bar.freq-0 { background: #53d8fb; }
+.metrics-bar.freq-1 { background: #ffeb3b; }
+.metrics-bar.freq-2 { background: #4caf50; }
+.metrics-bar.freq-3 { background: #e94560; }
+.metrics-label {
+  font-size: 0.52rem;
+  color: #446;
+  text-align: center;
+  margin-top: 3px;
+  white-space: nowrap;
+  transform: rotate(-45deg);
+  transform-origin: top left;
+  width: 28px;
+  overflow: hidden;
+}
+.metrics-legend {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.metrics-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.72rem;
+  color: #a0b8d8;
+}
+.metrics-legend-dot {
+  width: 10px; height: 10px; border-radius: 2px;
+}
+.metrics-legend-dot.freq-0 { background: #53d8fb; }
+.metrics-legend-dot.freq-1 { background: #ffeb3b; }
+.metrics-legend-dot.freq-2 { background: #4caf50; }
+.metrics-legend-dot.freq-3 { background: #e94560; }
+.metrics-empty { padding: 32px; text-align: center; color: #446; font-size: 0.85rem; }
 </style>
 </head>
 <body>
@@ -607,7 +699,8 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
       <input type="checkbox" id="ts-toggle" checked style="accent-color:#53d8fb;width:14px;height:14px;cursor:pointer">
       Timestamps
     </label>
-)HTML" + (logging_enabled ? R"HTML(    <button class="history-btn" id="history-btn" onclick="openHistory()">&#x1F4DC; History</button>
+)HTML" + (logging_enabled ? R"HTML(    <button class="history-btn" id="metrics-btn" onclick="openMetrics()">&#x1F4CA; Metrics</button>
+    <button class="history-btn" id="history-btn" onclick="openHistory()">&#x1F4DC; History</button>
 )HTML" : "") + R"HTML(  </div>
 </header>
 
@@ -654,6 +747,19 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
         <span class="hist-page-info" id="hist-page-info"></span>
         <button id="hist-next-btn" onclick="histPageNext()">Next &#8594;</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- Metrics modal -->
+<div id="metrics-modal" class="hist-overlay" style="display:none" onclick="if(event.target===this)closeMetrics()">
+  <div class="metrics-dialog">
+    <div class="hist-header">
+      <span class="hist-title">&#x1F4CA; Message Metrics</span>
+      <button class="hist-close" onclick="closeMetrics()" title="Close">&times;</button>
+    </div>
+    <div class="metrics-body" id="metrics-body">
+      <div class="metrics-empty" id="metrics-loading">Loading&hellip;</div>
     </div>
   </div>
 </div>
@@ -1877,6 +1983,89 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
   function closeMsgModal() {
     const modal = document.getElementById('msg-modal');
     if (modal) modal.style.display = 'none';
+  }
+
+  /* ── Metrics modal ─────────────────────────────────────────────────── */
+  function openMetrics() {
+    const modal = document.getElementById('metrics-modal');
+    if (!modal) return;
+    modal.style.display = 'flex';
+    const body = document.getElementById('metrics-body');
+    body.innerHTML = '<div class="metrics-empty" id="metrics-loading">Loading\u2026</div>';
+    const base = (window._BASE_PATH || '').replace(/\/$/, '');
+    fetch(base + '/api/metrics')
+      .then(function(r) { return r.json(); })
+      .then(function(data) { renderMetricsCharts(data); })
+      .catch(function(err) {
+        document.getElementById('metrics-body').innerHTML =
+          '<div class="metrics-empty">Failed to load metrics: ' + err + '</div>';
+      });
+  }
+
+  function closeMetrics() {
+    const modal = document.getElementById('metrics-modal');
+    if (modal) modal.style.display = 'none';
+  }
+
+  function renderMetricsCharts(data) {
+    const body = document.getElementById('metrics-body');
+    if (!body) return;
+    const freqs  = data.freqs  || [];
+    const hours  = data.hours  || [];
+    const days   = data.days   || [];
+
+    if (freqs.length === 0) {
+      body.innerHTML = '<div class="metrics-empty">No message data found.</div>';
+      return;
+    }
+
+    /* Find max count across all buckets for scaling */
+    function maxCount(buckets) {
+      var m = 1;
+      buckets.forEach(function(b) {
+        (b.counts || []).forEach(function(c) { if (c > m) m = c; });
+      });
+      return m;
+    }
+
+    function buildLegend(freqs) {
+      var html = '<div class="metrics-legend">';
+      freqs.forEach(function(f, i) {
+        html += '<div class="metrics-legend-item">'
+              + '<div class="metrics-legend-dot freq-' + i + '"></div>'
+              + '<span>' + f + '</span></div>';
+      });
+      return html + '</div>';
+    }
+
+    function buildChart(buckets, maxVal, labelEvery) {
+      var html = '<div class="metrics-chart">';
+      buckets.forEach(function(b, bi) {
+        html += '<div class="metrics-col"><div class="metrics-bar-group">';
+        (b.counts || []).forEach(function(c, fi) {
+          var h = maxVal > 0 ? Math.round(c / maxVal * 100) : 0;
+          html += '<div class="metrics-bar freq-' + fi + '" style="height:' + h + 'px" title="' + b.label + ': ' + c + '"></div>';
+        });
+        /* Show label every N columns to avoid crowding */
+        var lbl = (labelEvery <= 1 || bi % labelEvery === 0) ? b.label : '';
+        html += '</div><div class="metrics-label">' + lbl + '</div></div>';
+      });
+      return html + '</div>';
+    }
+
+    var maxH = maxCount(hours);
+    var maxD = maxCount(days);
+
+    body.innerHTML =
+      buildLegend(freqs)
+      + '<div>'
+        + '<div class="metrics-section-title">Messages per hour &mdash; last 24 hours</div>'
+        + buildChart(hours, maxH, 2)
+      + '</div>'
+      + '<div>'
+        + '<div class="metrics-section-title">Messages per day &mdash; last 30 days</div>'
+        + buildChart(days, maxD, 3)
+      + '</div>';
   }
 
   /* Default to 'Both' split view on load */
