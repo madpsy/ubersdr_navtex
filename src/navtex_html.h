@@ -744,13 +744,14 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
   <div class="hist-dialog">
     <div class="hist-header">
       <span class="hist-title">Message History</span>
+      <span id="hist-count" style="font-size:0.75rem;color:#557;margin-left:10px;font-family:'Courier New',monospace;"></span>
       <button class="hist-close" onclick="closeHistory()" title="Close">&times;</button>
     </div>
     <div class="hist-toolbar">
       <input type="text" id="hist-search" placeholder="Search&hellip;" oninput="filterHistory()" class="hist-search-input">
       <select id="hist-type-filter" onchange="filterHistory()" class="hist-freq-select">
         <option value="">Messages &amp; Raw Logs</option>
-        <option value="msg">Messages only</option>
+        <option value="msg" selected>Messages only</option>
         <option value="raw">Raw Logs only</option>
       </select>
       <select id="hist-subject-filter" onchange="filterHistory()" class="hist-freq-select">
@@ -1622,7 +1623,7 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
     modal.style.display = 'flex';
     /* Reset UI */
     document.getElementById('hist-search').value = '';
-    document.getElementById('hist-type-filter').value = '';
+    document.getElementById('hist-type-filter').value = 'msg';
     document.getElementById('hist-subject-filter').value = '';
     document.getElementById('hist-freq-filter').value = '';
     document.getElementById('hist-empty').style.display   = 'none';
@@ -1654,6 +1655,8 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
         if (presetFreq) {
           filterHistory();
         } else {
+          _histFiltered = _histData;
+          updateHistCount();
           renderHistTable(_histData);
         }
       })
@@ -1680,6 +1683,18 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
   var _histPage     = 0;
   var _HIST_PAGE_SZ = 50;
 
+  function updateHistCount() {
+    const countEl = document.getElementById('hist-count');
+    if (!countEl) return;
+    const totalMsgs    = _histData.filter(function(m) { return (m.type || 'msg') === 'msg'; }).length;
+    const filteredMsgs = _histFiltered.filter(function(m) { return (m.type || 'msg') === 'msg'; }).length;
+    if (filteredMsgs === totalMsgs) {
+      countEl.textContent = '(' + totalMsgs + ' messages)';
+    } else {
+      countEl.textContent = '(' + filteredMsgs + ' / ' + totalMsgs + ' messages)';
+    }
+  }
+
   function filterHistory() {
     const q       = (document.getElementById('hist-search').value || '').toLowerCase();
     const freq    = (document.getElementById('hist-freq-filter').value || '');
@@ -1705,6 +1720,7 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
       return true;
     });
     _histPage = 0;
+    updateHistCount();
     renderHistTable(_histFiltered);
   }
 
