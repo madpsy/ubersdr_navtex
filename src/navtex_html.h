@@ -739,6 +739,10 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
       <input type="checkbox" id="ts-toggle" checked style="accent-color:#53d8fb;width:14px;height:14px;cursor:pointer">
       Timestamps
     </label>
+    <label class="ts-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:0.78rem;color:#888;user-select:none">
+      <input type="checkbox" id="alert-sound-toggle" style="accent-color:#53d8fb;width:14px;height:14px;cursor:pointer">
+      Alert Sound
+    </label>
 )HTML" + (logging_enabled ? R"HTML(    <button class="history-btn" id="metrics-btn" onclick="openMetrics()">&#x1F4CA; Metrics</button>
     <button class="history-btn" id="history-btn" onclick="openHistory()">&#x1F4DC; History</button>
 )HTML" : "") + R"HTML(  </div>
@@ -876,6 +880,28 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
 
   /* Per-channel first-char flag */
   const firstChar = Array(NUM_CHANNELS).fill(true);
+
+  /* Per-channel previous 'act' state for alert-sound edge detection */
+  const prevActState = Array(NUM_CHANNELS).fill(0);
+
+  /* Play a short ding using the Web Audio API */
+  function playAlertDing() {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(880, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(660, ctx.currentTime + 0.15);
+      gain.gain.setValueAtTime(0.5, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.5);
+      osc.onended = function() { ctx.close(); };
+    } catch(e) {}
+  }
 
   /* Per-channel debounce timers for decoder state display */
   const decStateTimer     = Array(NUM_CHANNELS).fill(null);
@@ -1158,6 +1184,12 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
     if (s.act !== undefined) {
       if (s.act) { actDot.className = 'act-dot active'; actTxt.textContent = 'Active'; }
       else        { actDot.className = 'act-dot idle';   actTxt.textContent = 'Idle';   }
+      /* Alert sound: fire on idle -> active transition */
+      if (s.act && !prevActState[ch]) {
+        const alertToggle = document.getElementById('alert-sound-toggle');
+        if (alertToggle && alertToggle.checked) playAlertDing();
+      }
+      prevActState[ch] = s.act ? 1 : 0;
     }
 
     if (s.decState !== undefined) {
