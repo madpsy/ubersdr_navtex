@@ -1313,12 +1313,46 @@ static std::string history_list_json(const std::string &log_dir)
     /* Collect all .txt and .log file paths (skip .json sidecars — handled below) */
     struct FileEntry {
         std::string full;
+        /* sort_key is the frequency-independent date+time portion of the path,
+         * e.g. "2025/04/08/143022Z" for a message file or "2025-04-08" for a
+         * raw log.  Sorting on this key (descending) gives true chronological
+         * order across all frequencies. */
+        std::string sort_key;
         bool is_raw; /* true = .log raw file, false = .txt message file */
     };
     std::vector<FileEntry> files;
 
     /* Also collect the set of .json sidecar paths for quick lookup */
     std::set<std::string> json_sidecars;
+
+    /* Helper: given a relative path (freq stripped) derive a sort key.
+     * msg:  "2025/04/08/143022Z_EA42.txt" -> "2025/04/08/143022Z"
+     * raw:  "raw/2025-04-08.log"          -> "2025-04-08"           */
+    auto make_sort_key = [&](const std::string &rel_no_freq, bool raw) -> std::string {
+        if (raw) {
+            /* rel_no_freq: "raw/2025-04-08.log" — date is the stem of the filename */
+            size_t slash = rel_no_freq.rfind('/');
+            std::string fname = (slash == std::string::npos) ? rel_no_freq
+                                                              : rel_no_freq.substr(slash + 1);
+            if (fname.size() > 4) fname = fname.substr(0, fname.size() - 4); /* strip .log */
+            return fname; /* "2025-04-08" */
+        } else {
+            /* rel_no_freq: "2025/04/08/143022Z_EA42.txt"
+             * Keep everything up to (but not including) the first '_' in the filename */
+            size_t last_slash = rel_no_freq.rfind('/');
+            std::string dir_part  = (last_slash == std::string::npos) ? ""
+                                    : rel_no_freq.substr(0, last_slash); /* "2025/04/08" */
+            std::string file_part = (last_slash == std::string::npos) ? rel_no_freq
+                                    : rel_no_freq.substr(last_slash + 1);
+            size_t us = file_part.find('_');
+            std::string time_stem = (us == std::string::npos) ? file_part
+                                                               : file_part.substr(0, us);
+            /* strip .txt if no underscore */
+            if (time_stem.size() > 4 && time_stem.substr(time_stem.size()-4) == ".txt")
+                time_stem = time_stem.substr(0, time_stem.size()-4);
+            return dir_part.empty() ? time_stem : dir_part + "/" + time_stem;
+        }
+    };
 
     std::function<void(const std::string &)> walk = [&](const std::string &dir) {
         DIR *d = opendir(dir.c_str());
@@ -1334,10 +1368,20 @@ static std::string history_list_json(const std::string &log_dir)
                 subdirs.push_back(full);
             } else if (S_ISREG(st.st_mode)) {
                 std::string name = ent->d_name;
+                /* Derive the relative path (strip log_dir prefix and leading '/') */
+                std::string rel_full = full;
+                if (rel_full.substr(0, log_dir.size()) == log_dir)
+                    rel_full = rel_full.substr(log_dir.size());
+                if (!rel_full.empty() && rel_full[0] == '/') rel_full = rel_full.substr(1);
+                /* Strip the leading frequency component (everything up to first '/') */
+                size_t first_slash = rel_full.find('/');
+                std::string rel_no_freq = (first_slash == std::string::npos)
+                                          ? rel_full : rel_full.substr(first_slash + 1);
+
                 if (name.size() > 4 && name.substr(name.size()-4) == ".txt")
-                    files.push_back({full, false});
+                    files.push_back({full, make_sort_key(rel_no_freq, false), false});
                 else if (name.size() > 4 && name.substr(name.size()-4) == ".log")
-                    files.push_back({full, true});
+                    files.push_back({full, make_sort_key(rel_no_freq, true), true});
                 else if (name.size() > 5 && name.substr(name.size()-5) == ".json")
                     json_sidecars.insert(full);
             }
@@ -1347,10 +1391,11 @@ static std::string history_list_json(const std::string &log_dir)
     };
     walk(log_dir);
 
-    /* Sort newest-first (lexicographic descending on full path works because
-     * the path encodes YYYY/MM/DD/HHMMSS or YYYY-MM-DD) */
+    /* Sort newest-first by the frequency-independent date+time sort key.
+     * This ensures messages from different frequencies are interleaved in true
+     * chronological order rather than grouped by frequency directory name. */
     std::sort(files.begin(), files.end(),
-              [](const FileEntry &a, const FileEntry &b){ return a.full > b.full; });
+              [](const FileEntry &a, const FileEntry &b){ return a.sort_key > b.sort_key; });
 
     /* Build JSON array */
     std::string json = "[";
