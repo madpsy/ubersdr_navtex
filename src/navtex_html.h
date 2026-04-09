@@ -813,7 +813,7 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
   <div class="metrics-dialog">
     <div class="hist-header">
       <span class="hist-title">&#x1F4CA; Message Metrics</span>
-      <button class="hist-close" onclick="closeMetrics()" title="Close">&times;</button>
+      <button class="hist-close" style="margin-left:auto" onclick="closeMetrics()" title="Close">&times;</button>
     </div>
     <div class="metrics-body" id="metrics-body">
       <div class="metrics-empty" id="metrics-loading">Loading&hellip;</div>
