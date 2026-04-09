@@ -463,12 +463,13 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
 .hist-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   padding: 14px 18px 12px;
   border-bottom: 1px solid #1a3a5c;
   flex-shrink: 0;
+  gap: 8px;
 }
 .hist-title { font-size: 1rem; font-weight: 600; color: #c8dff0; letter-spacing: 0.02em; }
+.hist-title-group { display: flex; align-items: baseline; gap: 8px; }
 .hist-close {
   background: transparent; border: none; color: #557; cursor: pointer;
   font-size: 1.4rem; line-height: 1; padding: 0 4px;
@@ -743,9 +744,11 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
 <div id="history-modal" class="hist-overlay" style="display:none" onclick="if(event.target===this)closeHistory()">
   <div class="hist-dialog">
     <div class="hist-header">
-      <span class="hist-title">Message History</span>
-      <span id="hist-count" style="font-size:0.75rem;color:#557;margin-left:10px;font-family:'Courier New',monospace;"></span>
-      <button class="hist-close" onclick="closeHistory()" title="Close">&times;</button>
+      <div class="hist-title-group">
+        <span class="hist-title">Message History</span>
+        <span id="hist-count" style="font-size:0.75rem;color:#557;font-family:'Courier New',monospace;"></span>
+      </div>
+      <button class="hist-close" style="margin-left:auto" onclick="closeHistory()" title="Close">&times;</button>
     </div>
     <div class="hist-toolbar">
       <input type="text" id="hist-search" placeholder="Search&hellip;" oninput="filterHistory()" class="hist-search-input">
@@ -1652,13 +1655,7 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
           sel.value = presetFreq;
         }
         _histPage = 0;
-        if (presetFreq) {
-          filterHistory();
-        } else {
-          _histFiltered = _histData;
-          updateHistCount();
-          renderHistTable(_histData);
-        }
+        filterHistory();
       })
       .catch(function(err) {
         document.getElementById('hist-loading').style.display = 'none';
