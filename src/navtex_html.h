@@ -255,7 +255,7 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
 }
 .fec-track { display: flex; }
 .bar-track-sig {
-  background: linear-gradient(90deg, #1a6b1a, #4caf50, #ffeb3b, #e94560);
+  background: linear-gradient(90deg, #e94560, #ffeb3b, #4caf50, #1a6b1a);
 }
 .bar-fill {
   height: 100%; width: 100%;
