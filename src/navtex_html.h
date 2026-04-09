@@ -19,11 +19,16 @@ static std::string make_html_page(const std::string &sdr_url,
                                   bool logging_enabled = false)
 
 {
-    /* ---- Channel freq-label JS array (for per-channel history button) ---- */
+    /* ---- Channel freq-label JS array (for per-channel history button) ----
+     * The history API derives the "freq" field from the on-disk directory name,
+     * which is the label with spaces stripped (e.g. "518 kHz" -> "518kHz").
+     * We must use the same sanitised form so the dropdown value matches. */
     std::string ch_labels_js = "  const CH_FREQ_LABELS = [";
     for (size_t i = 0; i < channels.size(); i++) {
         if (i) ch_labels_js += ", ";
-        ch_labels_js += "\"" + channels[i].label + "\"";
+        std::string freq_dir = channels[i].label;
+        freq_dir.erase(std::remove(freq_dir.begin(), freq_dir.end(), ' '), freq_dir.end());
+        ch_labels_js += "\"" + freq_dir + "\"";
     }
     ch_labels_js += "];\n";
 
@@ -83,11 +88,13 @@ static std::string make_html_page(const std::string &sdr_url,
                    "<div class=\"fec-fec\"   id=\"fec-fec-"   + s + "\" style=\"width:0%\"></div>"
                    "<div class=\"fec-fail\"  id=\"fec-fail-"  + s + "\" style=\"width:0%\"></div>"
                    "</div></div>\n"
+            + "      <div style=\"display:flex;gap:4px;align-items:center;margin-left:auto\">\n"
             + (logging_enabled
-                ? "      <button class=\"icon-btn\" id=\"hist-ch-btn-" + s + "\" title=\"History for this frequency\" onclick=\"openHistoryForChannel(" + s + ")\" aria-label=\"History\">&#x1F4DC;</button>\n"
+                ? "        <button class=\"icon-btn\" id=\"hist-ch-btn-" + s + "\" title=\"History for this frequency\" onclick=\"openHistoryForChannel(" + s + ")\" aria-label=\"History\">&#x1F4DC;</button>\n"
                 : "")
-            + "      <button class=\"audio-btn\" id=\"audio-btn-" + s + "\" data-ch=\"" + s + "\">"
+            + "        <button class=\"audio-btn\" id=\"audio-btn-" + s + "\" data-ch=\"" + s + "\">"
                    "&#x1F50A;</button>\n"
+            + "      </div>\n"
             "    </div>\n"
             "    <div class=\"msg-bar idle\" id=\"msg-bar-" + s + "\">\n"
             "      <div class=\"stat\"><span class=\"stat-label\">Message</span>"
