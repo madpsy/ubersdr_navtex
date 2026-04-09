@@ -753,6 +753,24 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
         <option value="msg">Messages only</option>
         <option value="raw">Raw Logs only</option>
       </select>
+      <select id="hist-subject-filter" onchange="filterHistory()" class="hist-freq-select">
+        <option value="">All subjects</option>
+        <option value="A">A &mdash; Nav Warning</option>
+        <option value="B">B &mdash; Met Warning</option>
+        <option value="C">C &mdash; Ice</option>
+        <option value="D">D &mdash; SAR</option>
+        <option value="E">E &mdash; Met Forecast</option>
+        <option value="F">F &mdash; Pilot Service</option>
+        <option value="G">G &mdash; AIS</option>
+        <option value="H">H &mdash; LORAN</option>
+        <option value="I">I &mdash; Omega</option>
+        <option value="J">J &mdash; Satnav</option>
+        <option value="K">K &mdash; Other Nav</option>
+        <option value="L">L &mdash; Nav Warning (LORAN)</option>
+        <option value="T">T &mdash; Test</option>
+        <option value="X">X &mdash; Special</option>
+        <option value="Z">Z &mdash; No msg</option>
+      </select>
       <select id="hist-freq-filter" onchange="filterHistory()" class="hist-freq-select">
         <option value="">All frequencies</option>
       </select>
@@ -1604,8 +1622,9 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
     modal.style.display = 'flex';
     /* Reset UI */
     document.getElementById('hist-search').value = '';
-    document.getElementById('hist-freq-filter').value = '';
     document.getElementById('hist-type-filter').value = '';
+    document.getElementById('hist-subject-filter').value = '';
+    document.getElementById('hist-freq-filter').value = '';
     document.getElementById('hist-empty').style.display   = 'none';
     document.getElementById('hist-loading').style.display = 'block';
     document.getElementById('hist-tbody').innerHTML = '';
@@ -1662,12 +1681,19 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
   var _HIST_PAGE_SZ = 50;
 
   function filterHistory() {
-    const q    = (document.getElementById('hist-search').value || '').toLowerCase();
-    const freq = (document.getElementById('hist-freq-filter').value || '');
-    const type = (document.getElementById('hist-type-filter').value || '');
+    const q       = (document.getElementById('hist-search').value || '').toLowerCase();
+    const freq    = (document.getElementById('hist-freq-filter').value || '');
+    const type    = (document.getElementById('hist-type-filter').value || '');
+    const subject = (document.getElementById('hist-subject-filter').value || '').toUpperCase();
     _histFiltered = _histData.filter(function(m) {
       if (type && (m.type || 'msg') !== type) return false;
       if (freq && m.freq !== freq) return false;
+      if (subject) {
+        /* Subject is the second character of the id field (e.g. "EA42" -> 'A') */
+        const idStr = (m.id || '').toUpperCase();
+        const subCh = idStr.length >= 2 ? idStr[1] : '';
+        if (subCh !== subject) return false;
+      }
       if (q) {
         const dec = decodeNavtexId(m.id || '');
         const serial = m.serial || dec.serial || '';
