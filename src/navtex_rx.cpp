@@ -1020,22 +1020,15 @@ ccir_message::detect_result ccir_message::detect_header() {
 }
 
 bool ccir_message::detect_end() {
-    // Search for "NNNN" anywhere in the message, tolerating trailing
-    // whitespace/control characters that may follow the terminator
-    // (e.g. idle phasing characters decoded as \r\n after NNNN).
+    // NNNN is the NAVTEX end-of-transmission marker. Once found, the message
+    // is complete regardless of what follows — phasing/idle characters such as
+    // XOXV or RYRY are routinely transmitted after NNNN and must not block
+    // end-of-message detection.
     static const char stop_valid[] = "NNNN";
-    static const size_t slen = 4;
 
     size_t pos = rfind(stop_valid);
     if (pos == std::string::npos)
         return false;
-
-    // Verify that only whitespace/control characters follow NNNN
-    for (size_t i = pos + slen; i < size(); i++) {
-        unsigned char ch = (unsigned char)(*this)[i];
-        if (!isspace(ch) && !iscntrl(ch))
-            return false;
-    }
 
     // Trim everything from NNNN onward
     erase(pos);
