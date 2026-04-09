@@ -1130,7 +1130,7 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
     if (s.bb !== undefined) {
       if (isFinite(s.bb)) {
         bbEl.textContent = s.bb.toFixed(1);
-        const pct = Math.max(0, Math.min(100, (s.bb + 120) / 120 * 100));
+        const pct = Math.max(0, Math.min(100, (s.bb + 120) / 70 * 100));
         sigFill.style.marginLeft = pct + '%';
       } else {
         bbEl.textContent = '\u2014';
