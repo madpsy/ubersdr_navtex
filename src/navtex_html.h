@@ -17,7 +17,16 @@ static std::string make_html_page(const std::string &sdr_url,
                                   const std::vector<ChannelContext> &channels,
                                   const std::string &base_path = "",
                                   bool logging_enabled = false)
+
 {
+    /* ---- Channel freq-label JS array (for per-channel history button) ---- */
+    std::string ch_labels_js = "  const CH_FREQ_LABELS = [";
+    for (size_t i = 0; i < channels.size(); i++) {
+        if (i) ch_labels_js += ", ";
+        ch_labels_js += "\"" + channels[i].label + "\"";
+    }
+    ch_labels_js += "];\n";
+
     /* ---- Tab buttons (individual channels) ---- */
     std::string tab_buttons;
     for (size_t i = 0; i < channels.size(); i++) {
@@ -74,8 +83,11 @@ static std::string make_html_page(const std::string &sdr_url,
                    "<div class=\"fec-fec\"   id=\"fec-fec-"   + s + "\" style=\"width:0%\"></div>"
                    "<div class=\"fec-fail\"  id=\"fec-fail-"  + s + "\" style=\"width:0%\"></div>"
                    "</div></div>\n"
-            "      <button class=\"audio-btn\" id=\"audio-btn-" + s + "\" data-ch=\"" + s + "\">"
-                   "&#x1F50A; Audio</button>\n"
+            + (logging_enabled
+                ? "      <button class=\"icon-btn\" id=\"hist-ch-btn-" + s + "\" title=\"History for this frequency\" onclick=\"openHistoryForChannel(" + s + ")\" aria-label=\"History\">&#x1F4DC;</button>\n"
+                : "")
+            + "      <button class=\"audio-btn\" id=\"audio-btn-" + s + "\" data-ch=\"" + s + "\">"
+                   "&#x1F50A;</button>\n"
             "    </div>\n"
             "    <div class=\"msg-bar idle\" id=\"msg-bar-" + s + "\">\n"
             "      <div class=\"stat\"><span class=\"stat-label\">Message</span>"
@@ -686,6 +698,7 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
   const TAB_DOT_CLASS = ['searching', 'syncing', 'locked'];
 
   const NUM_CHANNELS = )HTML" + std::to_string(channels.size()) + R"HTML(;
+)HTML" + ch_labels_js + R"HTML(
 
   /* Per-channel first-char flag */
   const firstChar = Array(NUM_CHANNELS).fill(true);
@@ -794,6 +807,10 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
     if (copyBtn) copyBtn.onclick = function() { copyOutput(ch); };
     const dlBtn = document.getElementById('dl-btn-' + ch + '-s');
     if (dlBtn) dlBtn.onclick = function() { downloadOutput(ch); };
+
+    /* Per-channel history button */
+    const splitHistBtn = document.getElementById('hist-ch-btn-' + ch + '-s');
+    if (splitHistBtn) splitHistBtn.onclick = function() { openHistoryForChannel(ch); };
 
     /* Audio button */
     const splitAudioBtn = document.getElementById('audio-btn-' + ch + '-s');
@@ -1098,10 +1115,10 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
       if (!b) return;
       if (active) {
         b.className = 'audio-btn active';
-        b.textContent = '\uD83D\uDD0A Audio';
+        b.textContent = '\uD83D\uDD0A';
       } else {
         b.className = 'audio-btn';
-        b.textContent = '\uD83D\uDD0A Audio';
+        b.textContent = '\uD83D\uDD0A';
       }
     });
   }
@@ -1433,7 +1450,7 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
   /* ── History modal ─────────────────────────────────────────────────── */
   let _histData = [];   /* cached list from /api/history */
 
-  function openHistory() {
+  function openHistory(presetFreq) {
     const modal = document.getElementById('history-modal');
     if (!modal) return;
     modal.style.display = 'flex';
@@ -1462,8 +1479,16 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
           opt.textContent = f;
           sel.appendChild(opt);
         });
+        /* Apply preset frequency filter if supplied */
+        if (presetFreq) {
+          sel.value = presetFreq;
+        }
         _histPage = 0;
-        renderHistTable(_histData);
+        if (presetFreq) {
+          filterHistory();
+        } else {
+          renderHistTable(_histData);
+        }
       })
       .catch(function(err) {
         document.getElementById('hist-loading').style.display = 'none';
@@ -1475,6 +1500,12 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
   function closeHistory() {
     const modal = document.getElementById('history-modal');
     if (modal) modal.style.display = 'none';
+  }
+
+  /* Open history modal pre-filtered to the frequency of channel ch */
+  function openHistoryForChannel(ch) {
+    const label = (CH_FREQ_LABELS && CH_FREQ_LABELS[ch]) ? CH_FREQ_LABELS[ch] : '';
+    openHistory(label);
   }
 
   /* Pagination state */
