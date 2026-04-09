@@ -1020,20 +1020,27 @@ ccir_message::detect_result ccir_message::detect_header() {
 }
 
 bool ccir_message::detect_end() {
-    // Should be "\r\nNNNN\r\n" theoretically, but tolerates shorter strings.
+    // Search for "NNNN" anywhere in the message, tolerating trailing
+    // whitespace/control characters that may follow the terminator
+    // (e.g. idle phasing characters decoded as \r\n after NNNN).
+    static const char stop_valid[] = "NNNN";
     static const size_t slen = 4;
-    static const char stop_valid[slen + 1] = "NNNN";
-    size_t qlen = size();
-    if (qlen < slen) {
+
+    size_t pos = rfind(stop_valid);
+    if (pos == std::string::npos)
         return false;
+
+    // Verify that only whitespace/control characters follow NNNN
+    for (size_t i = pos + slen; i < size(); i++) {
+        unsigned char ch = (unsigned char)(*this)[i];
+        if (!isspace(ch) && !iscntrl(ch))
+            return false;
     }
-    std::string comp = substr(qlen - slen, slen);
-    bool end_seen = comp == stop_valid;
-    if(end_seen) {
-        erase(qlen - slen, slen);
-        LOG_INFO("\n%s", c_str());
-    }
-    return end_seen;
+
+    // Trim everything from NNNN onward
+    erase(pos);
+    LOG_INFO("\n%s", c_str());
+    return true;
 }
 
 void ccir_message::display(const std::string & alt_string) {
