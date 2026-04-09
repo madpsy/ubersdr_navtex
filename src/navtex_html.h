@@ -995,7 +995,7 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
   function syncSplitStats(ch) {
     /* Copy text content of every stat-value from real panel to split clone */
     const suffixes = ['bb-val','nd-val','rate-val','dec-state','fec-val','err-val',
-                      'act-text','snr-val','sig-fill','snr-fill',
+                      'act-dot','act-text','snr-val','sig-fill','snr-fill',
                       'fec-clean','fec-fec','fec-fail',
                       'msg-dot','msg-status','msg-station','msg-subject','msg-serial'];
     suffixes.forEach(function(name) {
