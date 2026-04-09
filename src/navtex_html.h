@@ -79,7 +79,7 @@ static std::string make_html_page(const std::string &sdr_url,
             "      <div class=\"stat\"><span class=\"stat-label\">SNR (dB)</span>"
                    "<span class=\"stat-value\" id=\"snr-val-" + s + "\">&mdash;</span></div>\n"
             "      <div class=\"bar-wrap\"><span class=\"stat-label\">Signal Level</span>"
-                   "<div class=\"bar-track\"><div class=\"bar-fill\" id=\"sig-fill-" + s + "\"></div></div></div>\n"
+                   "<div class=\"bar-track bar-track-sig\"><div class=\"bar-fill\" id=\"sig-fill-" + s + "\"></div></div></div>\n"
             "      <div class=\"bar-wrap\"><span class=\"stat-label\">SNR Level</span>"
                    "<div class=\"bar-track\"><div class=\"snr-fill\" id=\"snr-fill-" + s + "\"></div></div></div>\n"
             "      <div class=\"bar-wrap\"><span class=\"stat-label\">Quality (clean/fec/err)</span>"
@@ -254,10 +254,14 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
   border: 1px solid #0f3460;
 }
 .fec-track { display: flex; }
-.bar-fill {
-  height: 100%; width: 0%;
+.bar-track-sig {
   background: linear-gradient(90deg, #1a6b1a, #4caf50, #ffeb3b, #e94560);
+}
+.bar-fill {
+  height: 100%; width: 100%;
+  background: #0d0d1a;
   border-radius: 4px;
+  transition: margin-left 0.3s;
 }
 .snr-fill {
   height: 100%; width: 0%; border-radius: 4px;
@@ -1005,6 +1009,7 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
       dest.textContent = src.textContent;
       dest.className   = src.className;
       if (src.style && src.style.width !== undefined) dest.style.width = src.style.width;
+      if (src.style && src.style.marginLeft !== undefined) dest.style.marginLeft = src.style.marginLeft;
       if (src.style && src.style.background !== undefined) dest.style.background = src.style.background;
     });
     /* Sync tab-dot -> split-dot */
@@ -1126,10 +1131,10 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
       if (isFinite(s.bb)) {
         bbEl.textContent = s.bb.toFixed(1);
         const pct = Math.max(0, Math.min(100, (s.bb + 120) / 120 * 100));
-        sigFill.style.width = pct + '%';
+        sigFill.style.marginLeft = pct + '%';
       } else {
         bbEl.textContent = '\u2014';
-        sigFill.style.width = '0%';
+        sigFill.style.marginLeft = '100%';
       }
     }
     if (s.nd !== undefined)
