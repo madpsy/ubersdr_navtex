@@ -247,6 +247,7 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
   display: inline-block; margin-right: 4px; transition: background 0.5s;
 }
 .act-dot.active { background: #4caf50; box-shadow: 0 0 5px #4caf50; }
+.act-dot.idle   { background: #ffeb3b; box-shadow: 0 0 4px #ffeb3b; }
 .bar-wrap { flex: 1; min-width: 100px; display: flex; flex-direction: column; gap: 3px; }
 .bar-track {
   height: 7px; background: #0d0d1a; border-radius: 4px; overflow: hidden;
@@ -618,8 +619,30 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
   letter-spacing: 1px;
   margin-bottom: 10px;
 }
-/* Chart wrapper: bars on top, labels row below */
+/* Chart wrapper: Y-axis on left, bars+labels on right */
 .metrics-chart-wrap {
+  display: flex;
+  flex-direction: row;
+  gap: 6px;
+}
+.metrics-yaxis {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: flex-end;
+  height: 110px;
+  flex-shrink: 0;
+  padding-bottom: 0;
+}
+.metrics-ytick {
+  font-size: 0.55rem;
+  color: #c8dff0;
+  line-height: 1;
+  white-space: nowrap;
+}
+.metrics-chart-inner {
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
 }
@@ -1107,7 +1130,7 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
 
     if (s.act !== undefined) {
       if (s.act) { actDot.className = 'act-dot active'; actTxt.textContent = 'Active'; }
-      else        { actDot.className = 'act-dot';        actTxt.textContent = 'Idle';   }
+      else        { actDot.className = 'act-dot idle';   actTxt.textContent = 'Idle';   }
     }
 
     if (s.decState !== undefined) {
@@ -2050,7 +2073,15 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
       return html + '</div>';
     }
 
-    function buildChart(buckets, maxVal) {
+    function buildChart(buckets, maxVal, fmtLabel) {
+      /* Y-axis: max, mid, 0 */
+      var mid = maxVal > 0 ? Math.round(maxVal / 2) : 0;
+      var yaxisHtml = '<div class="metrics-yaxis">'
+        + '<span class="metrics-ytick">' + maxVal + '</span>'
+        + '<span class="metrics-ytick">' + mid + '</span>'
+        + '<span class="metrics-ytick">0</span>'
+        + '</div>';
+
       /* Bars row */
       var barsHtml = '<div class="metrics-bars-row">';
       buckets.forEach(function(b) {
@@ -2067,11 +2098,19 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
       /* Labels row — one cell per bucket, same flex proportions */
       var labelsHtml = '<div class="metrics-labels-row">';
       buckets.forEach(function(b) {
-        labelsHtml += '<div class="metrics-col-label"><span class="metrics-label">' + b.label + '</span></div>';
+        var lbl = fmtLabel ? fmtLabel(b.label) : b.label;
+        labelsHtml += '<div class="metrics-col-label"><span class="metrics-label">' + lbl + '</span></div>';
       });
       labelsHtml += '</div>';
 
-      return '<div class="metrics-chart-wrap">' + barsHtml + labelsHtml + '</div>';
+      var innerHtml = '<div class="metrics-chart-inner">' + barsHtml + labelsHtml + '</div>';
+      return '<div class="metrics-chart-wrap">' + yaxisHtml + innerHtml + '</div>';
+    }
+
+    /* Format "YYYY-MM-DD" -> "DD/MM" */
+    function fmtDayLabel(s) {
+      var parts = s.split('-');
+      return parts.length === 3 ? parts[2] + '/' + parts[1] : s;
     }
 
     var maxH = maxCount(hours);
@@ -2081,11 +2120,11 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
       buildLegend(freqs)
       + '<div>'
         + '<div class="metrics-section-title">Messages per hour &mdash; last 24 hours</div>'
-        + buildChart(hours, maxH)
+        + buildChart(hours, maxH, null)
       + '</div>'
       + '<div>'
         + '<div class="metrics-section-title">Messages per day &mdash; last 30 days</div>'
-        + buildChart(days, maxD)
+        + buildChart(days, maxD, fmtDayLabel)
       + '</div>';
   }
 
