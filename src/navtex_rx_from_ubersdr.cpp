@@ -51,6 +51,7 @@
 #include <atomic>
 #include <cerrno>
 #include <chrono>
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -758,9 +759,16 @@ static void save_message(const ChannelContext &ctx, const MsgParser &mp,
     if (nq > 0) {
         double avg_bb = metrics.sum_bb_power      / nq;
         double avg_nd = metrics.sum_noise_density / nq;
-        fprintf(jf, "  \"avg_bb_power_dbfs\": %.2f,\n",      avg_bb);
-        fprintf(jf, "  \"avg_noise_density_dbfs\": %.2f,\n", avg_nd);
-        fprintf(jf, "  \"avg_snr_db\": %.2f,\n",             avg_bb - avg_nd);
+        double avg_snr = avg_bb - avg_nd;
+        if (std::isfinite(avg_bb) && std::isfinite(avg_nd) && std::isfinite(avg_snr)) {
+            fprintf(jf, "  \"avg_bb_power_dbfs\": %.2f,\n",      avg_bb);
+            fprintf(jf, "  \"avg_noise_density_dbfs\": %.2f,\n", avg_nd);
+            fprintf(jf, "  \"avg_snr_db\": %.2f,\n",             avg_snr);
+        } else {
+            fprintf(jf, "  \"avg_bb_power_dbfs\": null,\n");
+            fprintf(jf, "  \"avg_noise_density_dbfs\": null,\n");
+            fprintf(jf, "  \"avg_snr_db\": null,\n");
+        }
     } else {
         fprintf(jf, "  \"avg_bb_power_dbfs\": null,\n");
         fprintf(jf, "  \"avg_noise_density_dbfs\": null,\n");
@@ -1619,9 +1627,19 @@ static std::string history_list_json(const std::string &log_dir)
             json += ",\"serial\":\""    + json_escape(serial_part) + "\"";
             json += ",\"has_metrics\":" + std::string(has_metrics ? "true" : "false");
             if (has_metrics) {
-                if (!inline_snr.empty())
+                /* Validate extracted values are real JSON numbers before embedding.
+                 * Guards against "-nan", "inf", etc. in existing sidecar files. */
+                auto is_json_number = [](const std::string &s) -> bool {
+                    if (s.empty()) return false;
+                    for (char c : s)
+                        if (!isdigit((unsigned char)c) && c != '-' && c != '.'
+                                && c != 'e' && c != 'E' && c != '+')
+                            return false;
+                    return true;
+                };
+                if (is_json_number(inline_snr))
                     json += ",\"snr\":" + inline_snr;
-                if (!inline_duration.empty())
+                if (is_json_number(inline_duration))
                     json += ",\"duration_s\":" + inline_duration;
             }
         }
