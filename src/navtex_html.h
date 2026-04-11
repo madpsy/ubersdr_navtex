@@ -1934,11 +1934,12 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
       .then(function(data) {
         _histData = Array.isArray(data) ? data : [];
         document.getElementById('hist-loading').style.display = 'none';
-        /* Populate station filter options from first char of id field */
+        /* Populate station filter options using the same decodeNavtexId logic as the table */
         const stations = [...new Set(
           _histData
-            .filter(function(m) { return m.id && m.id !== 'unknown' && (m.type || 'msg') === 'msg'; })
-            .map(function(m) { return m.id.toUpperCase()[0]; })
+            .filter(function(m) { return (m.type || 'msg') === 'msg'; })
+            .map(function(m) { return decodeNavtexId(m.id || '').station; })
+            .filter(function(s) { return s && s !== '\u2014'; })
         )].sort();
         const staSel = document.getElementById('hist-station-filter');
         while (staSel.options.length > 1) staSel.remove(1);
@@ -2011,10 +2012,8 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
       if (type && (m.type || 'msg') !== type) return false;
       if (freq && m.freq !== freq) return false;
       if (station) {
-        /* Station is the first character of the id field (e.g. "EA42" -> 'E') */
-        const idStr = (m.id || '').toUpperCase();
-        const staCh = idStr.length >= 1 ? idStr[0] : '';
-        if (staCh !== station) return false;
+        /* Station decoded the same way as the table column */
+        if (decodeNavtexId(m.id || '').station !== station) return false;
       }
       if (subject) {
         /* Subject is the second character of the id field (e.g. "EA42" -> 'A') */
