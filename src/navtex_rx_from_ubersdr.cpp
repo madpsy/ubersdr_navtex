@@ -124,7 +124,7 @@ static long http_post_json(const std::string &url,
     CurlBuf buf;
     struct curl_slist *headers = nullptr;
     headers = curl_slist_append(headers, "Content-Type: application/json");
-    headers = curl_slist_append(headers, "User-Agent: navtex_rx_from_ubersdr/2.0");
+    headers = curl_slist_append(headers, "User-Agent: ubersdr_navtex/2.0");
 
     curl_easy_setopt(curl, CURLOPT_URL,           url.c_str());
     curl_easy_setopt(curl, CURLOPT_POSTFIELDS,    json_body.c_str());
@@ -154,7 +154,7 @@ static long http_get(const std::string &url, std::string &out_body)
 
     CurlBuf buf;
     struct curl_slist *headers = nullptr;
-    headers = curl_slist_append(headers, "User-Agent: navtex_rx_from_ubersdr/2.0");
+    headers = curl_slist_append(headers, "User-Agent: ubersdr_navtex/2.0");
 
     curl_easy_setopt(curl, CURLOPT_URL,           url.c_str());
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER,    headers);
