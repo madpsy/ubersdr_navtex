@@ -46,10 +46,14 @@ static std::string make_html_page(const std::string &sdr_url,
             channels[i].name.c_str());
         tab_buttons += btn;
     }
-    /* "Both" tab — pushed to far right via margin-left:auto */
+    /* "Both" tab */
     tab_buttons +=
         "    <button class=\"tab-btn tab-btn-both\" id=\"tab-btn-both\" onclick=\"switchTab('both')\">"
         "&#x25A6; <span class=\"tab-name\">Both</span></button>\n";
+    /* "Latest" tab — pushed to far right via margin-left:auto */
+    tab_buttons +=
+        "    <button class=\"tab-btn tab-btn-latest\" id=\"tab-btn-latest\" onclick=\"switchTab('latest')\">"
+        "&#x1F4CB; <span class=\"tab-name\">Latest</span></button>\n";
 
     /* ---- Per-channel panels ---- */
     std::string panels;
@@ -167,12 +171,18 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
   align-items: flex-end;
 }
 .tab-btn-both {
-  margin-left: auto;  /* push to far right */
   border-color: #2a4a6a;
   color: #7ab8d8;
 }
 .tab-btn-both:hover { color: #53d8fb; }
 .tab-btn-both.active { color: #53d8fb; }
+.tab-btn-latest {
+  margin-left: auto;  /* push to far right */
+  border-color: #2a4a6a;
+  color: #a0c8a0;
+}
+.tab-btn-latest:hover { color: #4caf50; }
+.tab-btn-latest.active { color: #4caf50; }
 .tab-btn {
   background: #16213e;
   border: 1px solid #0f3460;
@@ -721,6 +731,92 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
 .metrics-legend-dot.freq-2 { background: #4caf50; }
 .metrics-legend-dot.freq-3 { background: #e94560; }
 .metrics-empty { padding: 32px; text-align: center; color: #446; font-size: 0.85rem; }
+
+/* ---- Latest panel ---- */
+#panel-latest {
+  flex-direction: column;
+  overflow-y: auto;
+  padding: 14px 16px;
+  gap: 20px;
+}
+.latest-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  margin-bottom: 4px;
+}
+.latest-toolbar-title {
+  font-size: 0.85rem;
+  color: #53d8fb;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+.latest-refresh-btn {
+  background: #16213e;
+  border: 1px solid #2a4a7f;
+  border-radius: 4px;
+  color: #a0b8d8;
+  cursor: pointer;
+  font-size: 0.82rem;
+  padding: 4px 10px;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  white-space: nowrap;
+}
+.latest-refresh-btn:hover { background: #1e3a6e; border-color: #53d8fb; color: #53d8fb; }
+.latest-last-updated {
+  font-size: 0.72rem;
+  color: #446;
+  margin-left: auto;
+}
+.latest-freq-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.latest-freq-title {
+  font-size: 0.78rem;
+  color: #53d8fb;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  border-bottom: 1px solid #1a3a5c;
+  padding-bottom: 4px;
+}
+.latest-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+.latest-table thead th {
+  background: #0a1628;
+  color: #557;
+  font-weight: 600;
+  padding: 7px 12px;
+  text-align: left;
+  border-bottom: 1px solid #1a3a5c;
+  white-space: nowrap;
+}
+.latest-table tbody tr {
+  border-bottom: 1px solid #111e30;
+  transition: background 0.1s;
+}
+.latest-table tbody tr:hover { background: #16213e; }
+.latest-table tbody td { padding: 7px 12px; color: #a0b8d8; vertical-align: middle; }
+.latest-table tbody td.lt-station { color: #c8dff0; font-family: monospace; font-weight: 600; font-size: 1rem; }
+.latest-table tbody td.lt-subject { color: #a0b8d8; }
+.latest-table tbody td.lt-serial  { font-family: monospace; color: #778; }
+.latest-table tbody td.lt-ts      { font-family: monospace; color: #557; font-size: 0.78rem; }
+.latest-table tbody td.lt-snr.good { color: #4caf50; font-family: monospace; }
+.latest-table tbody td.lt-snr.warn { color: #ff9800; font-family: monospace; }
+.latest-table tbody td.lt-snr.bad  { color: #f44336; font-family: monospace; }
+.latest-table tbody td.lt-snr.dim  { color: #446; font-family: monospace; }
+.latest-empty { padding: 20px; text-align: center; color: #446; font-size: 0.82rem; }
+.latest-view-btn {
+  background: #16213e; border: 1px solid #2a4a7f; border-radius: 3px;
+  color: #a0b8d8; cursor: pointer; font-size: 0.75rem; padding: 3px 8px;
+  transition: color 0.15s, border-color 0.15s;
+}
+.latest-view-btn:hover { border-color: #53d8fb; color: #53d8fb; }
 </style>
 </head>
 <body>
@@ -782,6 +878,9 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
         <option value="T">T &mdash; Test</option>
         <option value="X">X &mdash; Special</option>
         <option value="Z">Z &mdash; No msg</option>
+      </select>
+      <select id="hist-station-filter" onchange="filterHistory()" class="hist-freq-select">
+        <option value="">All stations</option>
       </select>
       <select id="hist-freq-filter" onchange="filterHistory()" class="hist-freq-select">
         <option value="">All frequencies</option>
@@ -850,6 +949,16 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
 )HTML" + panels + R"HTML(
   <div class="tab-panel" id="panel-both" style="display:none">
   </div>
+  <div class="tab-panel" id="panel-latest" style="display:none">
+    <div class="latest-toolbar">
+      <span class="latest-toolbar-title">&#x1F4CB; Latest Messages</span>
+      <button class="latest-refresh-btn" onclick="fetchLatest()">&#x1F504; Refresh</button>
+      <span class="latest-last-updated" id="latest-last-updated"></span>
+    </div>
+    <div id="latest-content">
+      <div class="latest-empty">Select this tab to load latest messages.</div>
+    </div>
+  </div>
 </div>
 <script>
   const SUBJECT = {
@@ -907,6 +1016,138 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
   const decStateTimer     = Array(NUM_CHANNELS).fill(null);
   const decStatePending   = Array(NUM_CHANNELS).fill(null);
   const decStateCommitted = Array(NUM_CHANNELS).fill(null); /* last value shown in UI */
+
+  /* ---- Latest tab ---- */
+  var _latestPollTimer = null;
+
+  function fetchLatest() {
+    var base = (window._BASE_PATH || '').replace(/\/$/, '');
+    var content = document.getElementById('latest-content');
+    var lastUpd = document.getElementById('latest-last-updated');
+    if (content) content.innerHTML = '<div class="latest-empty">Loading\u2026</div>';
+    fetch(base + '/api/latest')
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        renderLatestPanel(data);
+        if (lastUpd) {
+          var d = new Date();
+          lastUpd.textContent = 'Updated ' + d.toISOString().slice(11,19) + 'Z';
+        }
+      })
+      .catch(function(err) {
+        if (content)
+          content.innerHTML = '<div class="latest-empty">Failed to load: ' + err + '</div>';
+      });
+  }
+
+  function renderLatestPanel(data) {
+    var content = document.getElementById('latest-content');
+    if (!content) return;
+
+    if (!data || data.length === 0) {
+      content.innerHTML = '<div class="latest-empty">No complete messages received yet.</div>';
+      return;
+    }
+
+    /* Group by freq, preserving order of first appearance */
+    var freqOrder = [];
+    var byFreq = {};
+    data.forEach(function(m) {
+      if (!byFreq[m.freq]) {
+        byFreq[m.freq] = [];
+        freqOrder.push(m.freq);
+      }
+      byFreq[m.freq].push(m);
+    });
+
+    function snrCls(snr) {
+      if (snr === null || snr === undefined) return 'dim';
+      return snr > 45 ? 'good' : snr > 35 ? 'warn' : 'bad';
+    }
+
+    var html = '';
+    freqOrder.forEach(function(freq) {
+      var rows = byFreq[freq];
+      html += '<div class="latest-freq-section">';
+      html += '<div class="latest-freq-title">' + freq + '</div>';
+      html += '<table class="latest-table"><thead><tr>'
+            + '<th>Station</th><th>Subject</th><th>Serial</th>'
+            + '<th>Received (UTC)</th><th>SNR</th><th></th>'
+            + '</tr></thead><tbody>';
+
+      rows.forEach(function(m) {
+        var subCode = m.subject || '';
+        var subName = SUBJECT[subCode] || '';
+        var subDisp = subCode + (subName ? ' \u2013 ' + subName : '');
+        var serialDisp = (m.serial !== null && m.serial !== undefined) ? String(m.serial).padStart(2,'0') : '\u2014';
+        var tsDisp = (m.timestamp || '').replace('T',' ').replace('Z',' UTC');
+        var snrDisp = (m.snr_db !== null && m.snr_db !== undefined)
+                    ? Number(m.snr_db).toFixed(1) + ' dB' : '\u2014';
+        var snrClass = 'lt-snr ' + snrCls(m.snr_db);
+
+        html += '<tr>'
+              + '<td class="lt-station">' + (m.station || '\u2014') + '</td>'
+              + '<td class="lt-subject">' + subDisp + '</td>'
+              + '<td class="lt-serial">'  + serialDisp + '</td>'
+              + '<td class="lt-ts">'      + tsDisp + '</td>'
+              + '<td class="' + snrClass + '">' + snrDisp + '</td>'
+              + '<td><button class="latest-view-btn" data-text="' + encodeURIComponent(m.text || '')
+              + '" data-title="' + encodeURIComponent(freq + ' \u00b7 ' + (m.station||'') + (m.subject||'') + (serialDisp !== '\u2014' ? serialDisp : ''))
+              + '">View</button></td>'
+              + '</tr>';
+      });
+
+      html += '</tbody></table></div>';
+    });
+
+    content.innerHTML = html;
+
+    /* Wire View buttons */
+    content.querySelectorAll('.latest-view-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var text  = decodeURIComponent(btn.getAttribute('data-text') || '');
+        var title = decodeURIComponent(btn.getAttribute('data-title') || 'Message');
+        viewLatestMessage(text, title);
+      });
+    });
+  }
+
+  function viewLatestMessage(text, title) {
+    var modal   = document.getElementById('msg-modal');
+    var body    = document.getElementById('msg-modal-body');
+    var ttl     = document.getElementById('msg-modal-title');
+    var copyBtn = document.getElementById('msg-modal-copy-btn');
+    var dlBtn   = document.getElementById('msg-modal-dl-btn');
+    var panel   = document.getElementById('msg-metrics-panel');
+    if (!modal || !body) return;
+    ttl.textContent  = title || 'Message';
+    body.textContent = text;
+    if (panel) panel.className = 'msg-metrics-panel hidden';
+    if (copyBtn) {
+      copyBtn.style.opacity = '1';
+      copyBtn.onclick = function() {
+        if (navigator.clipboard && navigator.clipboard.writeText)
+          navigator.clipboard.writeText(text).catch(function() { fallbackCopy(text); });
+        else
+          fallbackCopy(text);
+      };
+    }
+    if (dlBtn) {
+      dlBtn.style.opacity = '1';
+      dlBtn.onclick = function() {
+        var blob = new Blob([text], { type: 'text/plain' });
+        var url  = URL.createObjectURL(blob);
+        var a    = document.createElement('a');
+        a.href     = url;
+        a.download = 'navtex-latest-' + new Date().toISOString().slice(0,19).replace(/:/g,'-') + '.txt';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      };
+    }
+    modal.style.display = 'flex';
+  }
 
   /* ---- Tab switching ---- */
   let activeTab = 'both';
@@ -1058,10 +1299,20 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
       if (btn)   btn.classList.remove('active');
       if (panel) panel.style.display = 'none';
     }
-    const bothBtn   = document.getElementById('tab-btn-both');
-    const bothPanel = document.getElementById('panel-both');
-    if (bothBtn)   bothBtn.classList.remove('active');
-    if (bothPanel) bothPanel.style.display = 'none';
+    const bothBtn    = document.getElementById('tab-btn-both');
+    const bothPanel  = document.getElementById('panel-both');
+    const latestBtn  = document.getElementById('tab-btn-latest');
+    const latestPanel= document.getElementById('panel-latest');
+    if (bothBtn)    bothBtn.classList.remove('active');
+    if (bothPanel)  bothPanel.style.display = 'none';
+    if (latestBtn)  latestBtn.classList.remove('active');
+    if (latestPanel)latestPanel.style.display = 'none';
+
+    /* Stop any existing latest poll timer when leaving the tab */
+    if (_latestPollTimer !== null) {
+      clearInterval(_latestPollTimer);
+      _latestPollTimer = null;
+    }
 
     if (ch === 'both') {
       buildSplitPanel();
@@ -1069,6 +1320,12 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
       for (let i = 0; i < NUM_CHANNELS; i++) syncSplitStats(i);
       if (bothBtn)   bothBtn.classList.add('active');
       if (bothPanel) bothPanel.style.display = 'flex';
+    } else if (ch === 'latest') {
+      if (latestBtn)   latestBtn.classList.add('active');
+      if (latestPanel) latestPanel.style.display = 'flex';
+      /* Fetch immediately on tab entry, then poll every 60 s */
+      fetchLatest();
+      _latestPollTimer = setInterval(fetchLatest, 60000);
     } else {
       const btn   = document.getElementById('tab-btn-' + ch);
       const panel = document.getElementById('panel-' + ch);
@@ -1665,6 +1922,7 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
     document.getElementById('hist-search').value = '';
     document.getElementById('hist-type-filter').value = 'msg';
     document.getElementById('hist-subject-filter').value = '';
+    document.getElementById('hist-station-filter').value = '';
     document.getElementById('hist-freq-filter').value = '';
     document.getElementById('hist-empty').style.display   = 'none';
     document.getElementById('hist-loading').style.display = 'block';
@@ -1676,6 +1934,20 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
       .then(function(data) {
         _histData = Array.isArray(data) ? data : [];
         document.getElementById('hist-loading').style.display = 'none';
+        /* Populate station filter options from first char of id field */
+        const stations = [...new Set(
+          _histData
+            .filter(function(m) { return m.id && m.id !== 'unknown' && (m.type || 'msg') === 'msg'; })
+            .map(function(m) { return m.id.toUpperCase()[0]; })
+        )].sort();
+        const staSel = document.getElementById('hist-station-filter');
+        while (staSel.options.length > 1) staSel.remove(1);
+        stations.forEach(function(s) {
+          const opt = document.createElement('option');
+          opt.value = s;
+          opt.textContent = s;
+          staSel.appendChild(opt);
+        });
         /* Populate frequency filter options */
         const freqs = [...new Set(_histData.map(function(m) { return m.freq; }))].sort();
         const sel = document.getElementById('hist-freq-filter');
@@ -1734,9 +2006,16 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
     const freq    = (document.getElementById('hist-freq-filter').value || '');
     const type    = (document.getElementById('hist-type-filter').value || '');
     const subject = (document.getElementById('hist-subject-filter').value || '').toUpperCase();
+    const station = (document.getElementById('hist-station-filter').value || '').toUpperCase();
     _histFiltered = _histData.filter(function(m) {
       if (type && (m.type || 'msg') !== type) return false;
       if (freq && m.freq !== freq) return false;
+      if (station) {
+        /* Station is the first character of the id field (e.g. "EA42" -> 'E') */
+        const idStr = (m.id || '').toUpperCase();
+        const staCh = idStr.length >= 1 ? idStr[0] : '';
+        if (staCh !== station) return false;
+      }
       if (subject) {
         /* Subject is the second character of the id field (e.g. "EA42" -> 'A') */
         const idStr = (m.id || '').toUpperCase();

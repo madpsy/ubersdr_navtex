@@ -807,6 +807,102 @@ static std::string utc_iso8601_now()
     return std::string(buf);
 }
 
+/* ------------------------------------------------------------------ */
+/* In-memory latest-message store                                       */
+/* ------------------------------------------------------------------ */
+struct LatestMessage {
+    std::string freq_label;   /* e.g. "518 kHz" */
+    char        station  = 0; /* e.g. 'E' */
+    char        subject  = 0; /* e.g. 'A' */
+    int         serial   = -1;
+    std::string text;         /* full reconstructed message (ZCZC … NNNN) */
+    std::string timestamp;    /* ISO-8601 UTC when NNNN was received */
+    double      snr_db   = 0.0;
+    bool        has_snr  = false;
+};
+
+/* Key: "<freq_label>:<station>:<subject>", e.g. "518 kHz:E:A" */
+static std::map<std::string, LatestMessage> g_latest_messages;
+static std::mutex                           g_latest_messages_mu;
+
+static void upsert_latest_message(const ChannelContext &ctx,
+                                  const MsgParser      &mp,
+                                  const MsgMetrics     &metrics)
+{
+    if (!mp.station || !mp.subject) return;
+
+    /* Build the full message text */
+    std::string text;
+    if (mp.station && mp.subject && mp.serial >= 0)
+        text = "ZCZC " + std::string(1, mp.station) + std::string(1, mp.subject)
+             + (mp.serial < 10 ? "0" : "") + std::to_string(mp.serial) + "\n";
+    else if (mp.station && mp.subject)
+        text = "ZCZC " + std::string(1, mp.station) + std::string(1, mp.subject) + "\n";
+    else
+        text = "ZCZC\n";
+    text += mp.body;
+    text += "NNNN\n";
+
+    /* Compute SNR */
+    double snr = 0.0;
+    bool has_snr = false;
+    if (metrics.sq_sample_count > 0) {
+        double avg_bb = metrics.sum_bb_power      / metrics.sq_sample_count;
+        double avg_nd = metrics.sum_noise_density / metrics.sq_sample_count;
+        snr = avg_bb - avg_nd;
+        has_snr = true;
+    }
+
+    std::string key = ctx.label + ":" + mp.station + ":" + mp.subject;
+
+    LatestMessage lm;
+    lm.freq_label = ctx.label;
+    lm.station    = mp.station;
+    lm.subject    = mp.subject;
+    lm.serial     = mp.serial;
+    lm.text       = std::move(text);
+    lm.timestamp  = utc_iso8601_now();
+    lm.snr_db     = snr;
+    lm.has_snr    = has_snr;
+
+    std::lock_guard<std::mutex> lk(g_latest_messages_mu);
+    g_latest_messages[key] = std::move(lm);
+}
+
+/* Serialise g_latest_messages to a JSON array.
+ * Forward-declares json_escape which is defined later in the History API section. */
+static std::string latest_messages_json()
+{
+    std::lock_guard<std::mutex> lk(g_latest_messages_mu);
+    std::string j = "[";
+    bool first = true;
+    for (const auto &kv : g_latest_messages) {
+        const LatestMessage &lm = kv.second;
+        if (!first) j += ",";
+        first = false;
+        j += "{";
+        j += "\"freq\":\""      + json_escape(lm.freq_label)          + "\"";
+        j += ",\"station\":\""  + json_escape(std::string(1, lm.station)) + "\"";
+        j += ",\"subject\":\""  + json_escape(std::string(1, lm.subject)) + "\"";
+        if (lm.serial >= 0)
+            j += ",\"serial\":"  + std::to_string(lm.serial);
+        else
+            j += ",\"serial\":null";
+        j += ",\"timestamp\":\"" + json_escape(lm.timestamp) + "\"";
+        if (lm.has_snr) {
+            char snrbuf[32];
+            snprintf(snrbuf, sizeof(snrbuf), "%.1f", lm.snr_db);
+            j += ",\"snr_db\":"  + std::string(snrbuf);
+        } else {
+            j += ",\"snr_db\":null";
+        }
+        j += ",\"text\":\""     + json_escape(lm.text) + "\"";
+        j += "}";
+    }
+    j += "]";
+    return j;
+}
+
 static ssize_t ws_cookie_write(void *cookie, const char *buf, size_t size)
 {
     auto *ctx = static_cast<ChannelContext *>(cookie);
@@ -862,6 +958,7 @@ static ssize_t ws_cookie_write(void *cookie, const char *buf, size_t size)
             if (ctx->msg_parser.complete && !was_cmp) {
                 ctx->msg_metrics.end_utc = utc_iso8601_now();
                 save_message(*ctx, ctx->msg_parser, ctx->msg_metrics);
+                upsert_latest_message(*ctx, ctx->msg_parser, ctx->msg_metrics);
                 ctx->msg_metrics.reset();
             }
         }
@@ -1967,6 +2064,15 @@ int main(int argc, const char **argv)
 
             auto resp = std::make_shared<ix::HttpResponse>();
             resp->headers["Access-Control-Allow-Origin"] = "*";
+
+            /* GET /api/latest — in-memory latest complete message per (freq, station, subject) */
+            if (path_only == "/api/latest") {
+                resp->statusCode  = 200;
+                resp->description = "OK";
+                resp->headers["Content-Type"] = "application/json";
+                resp->body = latest_messages_json();
+                return resp;
+            }
 
             /* GET /api/metrics — per-frequency message counts (last 24h by hour, last 30d by day) */
             if (path_only == "/api/metrics") {
