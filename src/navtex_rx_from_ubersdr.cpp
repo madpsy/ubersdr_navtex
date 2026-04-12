@@ -897,7 +897,7 @@ static std::string latest_messages_json()
         else
             j += ",\"serial\":null";
         j += ",\"timestamp\":\"" + json_escape(lm.timestamp) + "\"";
-        if (lm.has_snr) {
+        if (lm.has_snr && std::isfinite(lm.snr_db)) {
             char snrbuf[32];
             snprintf(snrbuf, sizeof(snrbuf), "%.1f", lm.snr_db);
             j += ",\"snr_db\":"  + std::string(snrbuf);
