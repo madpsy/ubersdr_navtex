@@ -15,6 +15,8 @@ services:
       NAVTEX_LOG_RETAIN_DAYS: "30"
       # Uncomment and set as needed:
       # WEB_PORT: "6092"
+      # UI_PASSWORD: ""   # Set a password to enable write actions in the web UI.
+                          # Leave empty (default) to disable all write actions.
     volumes:
       - ./navtex_logs:/data/navtex_logs
     networks:
