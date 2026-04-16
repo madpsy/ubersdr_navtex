@@ -9,6 +9,7 @@
 #define _NAVTEX_RX_H
 
 #include <complex>
+#include <cstdint>
 #include <cstdio>
 #include <string>
 #include <vector>
@@ -112,7 +113,7 @@ private:
 
     ccir_message m_curr_msg;
 
-    int m_sample_count;
+    int64_t m_sample_count;
     double m_bit_sample_count;
 
     double m_early_accumulator;
@@ -128,7 +129,16 @@ private:
 
     bool m_pulse_edge_event;
 
-    int m_averaged_mark_state;
+    double m_averaged_mark_state;
+
+    // Envelope and noise tracking (per-instance, not static)
+    double m_mark_env;
+    double m_space_env;
+    double m_mark_noise;
+    double m_space_noise;
+
+    // Last decoded code (for rep/alpha phase correction, per-instance)
+    int m_last_char;
 
     enum State { SYNC_SETUP, SYNC, READ_DATA };
     State m_state;

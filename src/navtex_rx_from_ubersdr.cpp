@@ -1049,6 +1049,17 @@ static void run_channel(ChannelContext *ctx, const std::string &base_url)
                  "&user_session_id=%s",
                  ws_base.c_str(), ctx->dial_hz, session_id.c_str());
 
+        /* Reset the decoder at the start of every session so that
+         * m_sample_count and all internal state start fresh.  Without
+         * this, m_sample_count (int64_t) would accumulate across
+         * reconnections and the event-counter comparisons would
+         * eventually diverge. */
+        fprintf(stderr, "[ch%d] resetting decoder for new session\n", ctx->channel_id);
+        ctx->decoder->~navtex_rx();
+        new (ctx->decoder) navtex_rx(ctx->current_sample_rate,
+                                     false, false,
+                                     ctx->broadcast_file);
+
         std::atomic<bool> connected{false};
         std::atomic<bool> session_done{false};
 
@@ -1090,7 +1101,7 @@ static void run_channel(ChannelContext *ctx, const std::string &base_url)
                     /* Recreate decoder if sample rate changed */
                     if (ctx->meta.sample_rate != 0 &&
                         (int)ctx->meta.sample_rate != ctx->current_sample_rate) {
-                        fprintf(stderr, "[ch%d] sample rate: %u Hz\n",
+                        fprintf(stderr, "[ch%d] sample rate changed to %u Hz — resetting decoder\n",
                                 ctx->channel_id, ctx->meta.sample_rate);
                         ctx->current_sample_rate = (int)ctx->meta.sample_rate;
                         ctx->decoder->~navtex_rx();

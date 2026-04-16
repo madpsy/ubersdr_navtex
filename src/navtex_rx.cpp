@@ -228,6 +228,13 @@ navtex_rx::navtex_rx(int sample_rate, bool only_sitor_b, bool reverse,
 
     m_sample_count = 0;
 
+    m_mark_env   = 0.0;
+    m_space_env  = 0.0;
+    m_mark_noise = 0.0;
+    m_space_noise = 0.0;
+
+    m_last_char = 0;
+
     m_early_accumulator = 0;
     m_prompt_accumulator = 0;
     m_late_accumulator = 0;
@@ -403,10 +410,6 @@ cmplx navtex_rx::mixer(double & phase, double f, cmplx in)
 
 void navtex_rx::process_fft_output(cmplx * zp_mark, cmplx * zp_space, int samples)
 {
-    // envelope & noise levels for mark & space, respectively
-    static double mark_env = 0, space_env = 0;
-    static double mark_noise = 0, space_noise = 0;
-
     for (int i = 0; i < samples; i++) {
         double mark_abs = abs(zp_mark[i]);
         double space_abs = abs(zp_space[i]);
@@ -414,29 +417,29 @@ void navtex_rx::process_fft_output(cmplx * zp_mark, cmplx * zp_space, int sample
         process_multicorrelator();
 
         // determine noise floor & envelope for mark & space
-        mark_env = envelope_decay(mark_env, mark_abs);
-        mark_noise = noise_decay(mark_noise, mark_abs);
+        m_mark_env = envelope_decay(m_mark_env, mark_abs);
+        m_mark_noise = noise_decay(m_mark_noise, mark_abs);
 
-        space_env = envelope_decay(space_env, space_abs);
-        space_noise = noise_decay(space_noise, space_abs);
+        m_space_env = envelope_decay(m_space_env, space_abs);
+        m_space_noise = noise_decay(m_space_noise, space_abs);
 
-        double noise_floor = (space_noise + mark_noise) / 2;
+        double noise_floor = (m_space_noise + m_mark_noise) / 2;
 
         // clip mark & space to envelope & floor
-        mark_abs = std::min(mark_abs, mark_env);
+        mark_abs = std::min(mark_abs, m_mark_env);
         mark_abs = std::max(mark_abs, noise_floor);
 
-        space_abs = std::min(space_abs, space_env);
+        space_abs = std::min(space_abs, m_space_env);
         space_abs = std::max(space_abs, noise_floor);
 
         // mark-space discriminator with automatic threshold
         // correction, see:
         // http://www.w7ay.net/site/Technical/ATC/
         double logic_level =
-            (mark_abs - noise_floor) * (mark_env - noise_floor) -
-            (space_abs - noise_floor) * (space_env - noise_floor) -
-            0.5 * ( (mark_env - noise_floor) * (mark_env - noise_floor) -
-                 (space_env - noise_floor) * (space_env - noise_floor));
+            (mark_abs - noise_floor) * (m_mark_env - noise_floor) -
+            (space_abs - noise_floor) * (m_space_env - noise_floor) -
+            0.5 * ( (m_mark_env - noise_floor) * (m_mark_env - noise_floor) -
+                 (m_space_env - noise_floor) * (m_space_env - noise_floor));
 
         // Using the logarithm of the logic_level tells the
         // bit synchronization and character decoding which
@@ -517,7 +520,8 @@ void navtex_rx::process_fft_output(cmplx * zp_mark, cmplx * zp_space, int sample
 void navtex_rx::process_multicorrelator()
 {
     // Adjust the sampling period once every 8 bit periods.
-    if (m_sample_count % (int)(m_bit_sample_count * 8))
+    // Use int64_t arithmetic to match m_sample_count and avoid overflow.
+    if (m_sample_count % (int64_t)(m_bit_sample_count * 8))
         return;
 
     // Calculate the slope between early and late signals
@@ -838,13 +842,12 @@ decode:
 }
 
 bool navtex_rx::process_char(int chr) {
-    static int last_char = 0;
     switch (chr) {
         case code_rep:
             // This code should run in alpha phase, but
             // it just received two rep characters. Fix
             // the rep/alpha phase, so FEC works again.
-            if (last_char == code_rep) {
+            if (m_last_char == code_rep) {
                 LOG_DEBUG("fixing rep/alpha sync");
                 m_alpha_phase = false;
             }
@@ -872,7 +875,7 @@ bool navtex_rx::process_char(int chr) {
             break;
         } // switch
 
-    last_char = chr;
+    m_last_char = chr;
     return true;
 }
 
