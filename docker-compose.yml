@@ -21,6 +21,12 @@ services:
       - ./navtex_logs:/data/navtex_logs
     networks:
       - sdr-network
+    logging:
+      driver: "fluentd"
+      options:
+        fluentd-address: "127.0.0.1:24224"
+        fluentd-async: "true"
+        tag: "navtex"
 
 networks:
   sdr-network:
