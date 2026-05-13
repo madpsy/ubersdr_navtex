@@ -3,6 +3,7 @@ services:
     container_name: navtex
     image: madpsy/ubersdr_navtex:latest
     restart: unless-stopped
+    cpu_shares: 512
     environment:
       # UberSDR base URL
       UBERSDR_URL: "http://ubersdr:8080"
