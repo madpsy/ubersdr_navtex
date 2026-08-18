@@ -59,6 +59,30 @@ target_link_libraries(navtex_rx_from_ubersdr
     m
 )
 
+# -----------------------------------------------------------------------
+# mqtt_selftest: unit tests for the MQTT payload builders.
+#
+# Includes navtex_rx_from_ubersdr.cpp rather than linking it, because the
+# builders are file-static. Not installed, and not built by default — run:
+#   cmake --build build --target mqtt_selftest && ./build/src/mqtt_selftest
+# -----------------------------------------------------------------------
+add_executable(mqtt_selftest EXCLUDE_FROM_ALL mqtt_selftest.cpp)
+
+target_include_directories(mqtt_selftest PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${IXWS_INCLUDE_DIRS}
+    ${ZSTD_INCLUDE_DIRS}
+    ${CURL_INCLUDE_DIRS}
+)
+
+target_link_libraries(mqtt_selftest
+    libnavtex
+    ${IXWS_LIBS}
+    ${ZSTD_LIBRARIES}
+    ${CURL_LIBRARIES}
+    m
+)
+
 include(GNUInstallDirs)
 install(TARGETS libnavtex navtex_rx_from_file navtex_rx_from_ubersdr)
 install(FILES navtex_rx.h TYPE INCLUDE)

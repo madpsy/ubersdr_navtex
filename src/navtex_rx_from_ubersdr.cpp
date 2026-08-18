@@ -52,10 +52,14 @@
 #include <cerrno>
 #include <chrono>
 #include <cmath>
+#include <condition_variable>
+#include <cctype>
+#include <cstdarg>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
+#include <deque>
 #include <functional>
 #include <map>
 #include <mutex>
@@ -639,6 +643,610 @@ static void rotate_raw_log_if_needed(ChannelContext *ctx)
 /* Forward declaration — defined later in the History API section */
 static std::string json_escape(const std::string &s);
 
+/* ================================================================== */
+/* MQTT publishing via UberSDR's addon ingest port                     */
+/* ================================================================== */
+/*
+ * UberSDR exposes an ingest port on the sdr-network that lets addons publish
+ * through the receiver's own MQTT connection, and declare Home Assistant
+ * entities, without holding any broker credentials. See addon_mqtt.md in the
+ * ka9q_ubersdr repository for the full API.
+ *
+ * This is not optional and needs no configuration. The endpoint is derived from
+ * the UberSDR URL this decoder is already using, so the existing
+ * docker-compose.yml is sufficient as-is. When the receiver has MQTT disabled,
+ * or this container is not a recognised addon, publishing is skipped and the
+ * decoder runs exactly as before.
+ *
+ * Two topics:
+ *
+ *   messages  — one message per completed NAVTEX transmission, INCLUDING the
+ *               full decoded text (not retained)
+ *   summary   — counters and last-message state, retained, every 30 s
+ *
+ * Publishing never blocks decoding. Completed messages go onto a bounded queue
+ * drained by one background thread: the completion hook runs on the channel's
+ * audio callback, where a stalled HTTP request would drop incoming samples.
+ */
+
+/* UberSDR's mqtt.addon_ingest.port default. */
+static constexpr int MQTT_DEFAULT_INGEST_PORT = 6926;
+
+/* Populates this addon's Home Assistant device card. */
+static const char *MQTT_ADDON_VERSION = "2.1.0";
+static const char *MQTT_ADDON_MODEL   = "NAVTEX / SITOR-B decoder";
+
+/* Must stay well below the receiver's offline_after_sec (default 300) or it
+ * would mark us offline between updates and Home Assistant would flap. */
+static constexpr int MQTT_SUMMARY_INTERVAL_S = 30;
+
+/* A NAVTEX body is capped at MAX_MSG_BODY (8 KiB) by the parser, and the ingest
+ * default payload cap is 64 KiB, so a full message plus its metadata always
+ * fits — the whole text is published rather than a summary of it. */
+static constexpr size_t MQTT_QUEUE_MAX = 64;
+
+/* Home Assistant caps a state at 255 characters and keeps attributes in the
+ * recorder, so the text carried as an ATTRIBUTE is trimmed. The complete text
+ * always goes out on the messages topic. */
+static constexpr size_t MQTT_TEXT_ATTR_MAX = 1024;
+
+/* NAVTEX subject indicator (B2 character), ITU-R M.540 / IMO NAVTEX Manual.
+ * Turning the letter into words is the difference between a Home Assistant
+ * card that reads "A" and one that reads "Navigational warning". */
+static const char *navtex_subject_name(char subject)
+{
+    switch (subject) {
+    case 'A': return "Navigational warning";
+    case 'B': return "Meteorological warning";
+    case 'C': return "Ice report";
+    case 'D': return "Search and rescue";
+    case 'E': return "Meteorological forecast";
+    case 'F': return "Pilot service";
+    case 'G': return "AIS";
+    case 'H': return "LORAN";
+    case 'I': return "Spare";
+    case 'J': return "SATNAV";
+    case 'K': return "Other electronic navaid";
+    case 'L': return "Additional navigational warning";
+    case 'T': return "Test transmission";
+    case 'V': case 'W': case 'X': case 'Y': return "Special service";
+    case 'Z': return "No messages on hand";
+    default:  return "";
+    }
+}
+
+/* Replace anything that is not printable ASCII (or ordinary whitespace) with
+ * '?'.
+ *
+ * This is not cosmetic. CCIR476::code_to_char returns a NEGATED code for any
+ * bit pattern with no character assigned, and navtex_rx::filter_print passes
+ * everything except -1, CR, ALPHA and REP straight to the output — so a garbled
+ * SITOR-B decode puts bytes >= 0x80 into the message body. Escaped as-is those
+ * bytes are not valid UTF-8, and JSON strings must be: the payload would reach
+ * the broker but fail to decode in Home Assistant.
+ *
+ * NAVTEX is a 5-bit ASCII-subset alphabet, so nothing legitimate is lost, and a
+ * '?' is an honest rendering of a character the decoder could not resolve. */
+static std::string mqtt_sanitise_text(const std::string &s)
+{
+    std::string out;
+    out.reserve(s.size());
+    for (unsigned char c : s) {
+        if (c == '\n' || c == '\r' || c == '\t') out += (char)c;
+        else if (c >= 0x20 && c < 0x7F)          out += (char)c;
+        else                                     out += '?';
+    }
+    return out;
+}
+
+/* Read a boolean field out of a flat JSON object.
+ *
+ * This file has no JSON parser and pulling one in for two booleans is not
+ * worth it — but a plain substring search for "key":true is too fragile: a
+ * single space after the colon, which most encoders emit, would silently read
+ * as false and quietly disable Home Assistant discovery with no error anywhere.
+ * So skip whitespace explicitly rather than assuming a layout. */
+static bool json_find_bool(const std::string &body, const char *key, bool dflt)
+{
+    std::string needle = std::string("\"") + key + "\"";
+    size_t p = body.find(needle);
+    if (p == std::string::npos) return dflt;
+
+    p += needle.size();
+    while (p < body.size() && isspace((unsigned char)body[p])) p++;
+    if (p >= body.size() || body[p] != ':') return dflt;
+    p++;
+    while (p < body.size() && isspace((unsigned char)body[p])) p++;
+
+    if (body.compare(p, 4, "true")  == 0) return true;
+    if (body.compare(p, 5, "false") == 0) return false;
+    return dflt;
+}
+
+/* One completed message, queued for publishing. */
+struct MqttMessageEvent {
+    long        freq_hz    = 0;
+    std::string freq_label;
+    std::string channel_name;
+    char        station    = 0;
+    char        subject    = 0;
+    int         serial     = -1;
+    std::string text;         /* full ZCZC … NNNN */
+    std::string body;         /* body only */
+    std::string start_utc;
+    std::string end_utc;
+    int         duration_s  = 0;
+    bool        has_snr     = false;
+    double      snr_db      = 0.0;
+    double      chars_clean_pct  = 0.0;
+    double      chars_fec_pct    = 0.0;
+    double      chars_failed_pct = 0.0;
+    bool        has_char_stats   = false;
+};
+
+/* Number of channels with an open audio WebSocket. Written by run_channel. */
+static std::atomic<int> g_mqtt_channels_connected{0};
+
+/* ---------------------------------------------------------------- */
+/* Payload building — free functions so the self-test can call them   */
+/* (see mqtt_selftest.cpp). Pure: no I/O, no shared state.            */
+/* ---------------------------------------------------------------- */
+
+static std::string mqtt_fmt_double(double v, int places)
+{
+    if (!std::isfinite(v)) return "null";
+    char b[64];
+    snprintf(b, sizeof(b), "%.*f", places, v);
+    return std::string(b);
+}
+
+static std::string mqtt_msg_id(const MqttMessageEvent &ev)
+{
+    if (!ev.station || !ev.subject) return "";
+    std::string id;
+    id += ev.station;
+    id += ev.subject;
+    if (ev.serial >= 0) {
+        char b[8];
+        snprintf(b, sizeof(b), "%02d", ev.serial);
+        id += b;
+    }
+    return id;
+}
+
+static std::string mqtt_message_json(const MqttMessageEvent &ev)
+{
+    std::string j = "{";
+    j += "\"id\":\""           + json_escape(mqtt_msg_id(ev)) + "\"";
+    j += ",\"freq_hz\":"       + std::to_string(ev.freq_hz);
+    j += ",\"freq_khz\":"      + mqtt_fmt_double(ev.freq_hz / 1000.0, 1);
+    j += ",\"freq_label\":\""  + json_escape(ev.freq_label) + "\"";
+    j += ",\"channel\":\""     + json_escape(ev.channel_name) + "\"";
+    j += ",\"station\":\""     + json_escape(ev.station ? std::string(1, ev.station) : "") + "\"";
+    j += ",\"subject\":\""     + json_escape(ev.subject ? std::string(1, ev.subject) : "") + "\"";
+    j += ",\"subject_name\":\"" + json_escape(navtex_subject_name(ev.subject)) + "\"";
+    if (ev.serial >= 0) j += ",\"serial\":" + std::to_string(ev.serial);
+    else                j += ",\"serial\":null";
+    j += ",\"start_utc\":\""   + json_escape(ev.start_utc) + "\"";
+    j += ",\"end_utc\":\""     + json_escape(ev.end_utc)   + "\"";
+    j += ",\"duration_s\":"    + std::to_string(ev.duration_s);
+    j += ",\"char_count\":"    + std::to_string(ev.body.size());
+    if (ev.has_snr) j += ",\"snr_db\":" + mqtt_fmt_double(ev.snr_db, 2);
+    else            j += ",\"snr_db\":null";
+    if (ev.has_char_stats) {
+        j += ",\"chars_clean_pct\":"  + mqtt_fmt_double(ev.chars_clean_pct, 1);
+        j += ",\"chars_fec_pct\":"    + mqtt_fmt_double(ev.chars_fec_pct, 1);
+        j += ",\"chars_failed_pct\":" + mqtt_fmt_double(ev.chars_failed_pct, 1);
+    }
+    /* The whole decoded message. A NAVTEX body cannot exceed MAX_MSG_BODY
+     * (8 KiB), well inside the ingest payload cap. */
+    j += ",\"text\":\""        + json_escape(ev.text) + "\"";
+    j += ",\"body\":\""        + json_escape(ev.body) + "\"";
+    j += "}";
+    return j;
+}
+
+
+class MqttPublisher {
+public:
+    /* Derive the ingest endpoint from the UberSDR base URL: same host, the
+     * ingest port. UBERSDR_INGEST_URL overrides it outright for the rare case
+     * where the operator has moved the port.
+     *
+     * Always plain http: the ingest port is reachable only from the
+     * sdr-network, so an https base URL for the public interface is irrelevant
+     * here. */
+    static std::string derive_base(const std::string &ubersdr_url)
+    {
+        const char *env = getenv("UBERSDR_INGEST_URL");
+        if (env && *env) {
+            std::string s(env);
+            while (!s.empty() && s.back() == '/') s.pop_back();
+            if (!s.empty()) return s;
+        }
+
+        /* Strip scheme */
+        std::string rest = ubersdr_url;
+        size_t scheme = rest.find("://");
+        if (scheme != std::string::npos) rest = rest.substr(scheme + 3);
+
+        /* Drop any path, query or fragment */
+        size_t cut = rest.find_first_of("/?#");
+        if (cut != std::string::npos) rest = rest.substr(0, cut);
+
+        /* Drop credentials */
+        size_t at = rest.rfind('@');
+        if (at != std::string::npos) rest = rest.substr(at + 1);
+
+        /* Split host from port. An IPv6 literal is bracketed, and its colons
+         * must not be mistaken for a port separator. */
+        std::string host = rest;
+        if (!rest.empty() && rest[0] == '[') {
+            size_t close = rest.find(']');
+            if (close != std::string::npos) host = rest.substr(0, close + 1);
+        } else {
+            size_t colon = rest.find(':');
+            if (colon != std::string::npos) host = rest.substr(0, colon);
+        }
+
+        if (host.empty()) host = "ubersdr";
+        return "http://" + host + ":" + std::to_string(MQTT_DEFAULT_INGEST_PORT);
+    }
+
+    void start(const std::string &ubersdr_url)
+    {
+        base_ = derive_base(ubersdr_url);
+        fprintf(stderr, "[mqtt] ingest endpoint: %s\n", base_.c_str());
+
+        probe();
+
+        running_ = true;
+        worker_  = std::thread(&MqttPublisher::run_worker,  this);
+        summary_ = std::thread(&MqttPublisher::run_summary, this);
+    }
+
+    void stop()
+    {
+        {
+            std::lock_guard<std::mutex> lk(mu_);
+            running_ = false;
+        }
+        cv_.notify_all();
+        if (worker_.joinable())  worker_.join();
+        if (summary_.joinable()) summary_.join();
+    }
+
+    /* Queue a completed message. Never blocks: this is called from the audio
+     * callback thread. */
+    void publish_message(const MqttMessageEvent &ev)
+    {
+        {
+            std::lock_guard<std::mutex> lk(mu_);
+            total_messages_++;
+            message_times_.push_back(std::chrono::steady_clock::now());
+            last_ = ev;
+            has_last_ = true;
+            per_freq_[ev.freq_label]++;
+
+            if (!available_) return;   /* nothing to send to */
+
+            if (queue_.size() >= MQTT_QUEUE_MAX) {
+                dropped_++;
+                return;
+            }
+            queue_.push_back(ev);
+        }
+        cv_.notify_one();
+    }
+
+private:
+    /* ---------------- availability ---------------- */
+
+    bool probe()
+    {
+        std::string body;
+        long code = http_get(base_ + "/health", body);
+
+        if (code < 0) {
+            unavailable("ingest port unreachable — continuing without MQTT");
+            return false;
+        }
+        if (code == 403) {
+            unavailable("this container is not a recognised UberSDR addon — "
+                        "continuing without MQTT");
+            return false;
+        }
+        if (code != 200) {
+            unavailable("ingest health returned %ld — continuing without MQTT", code);
+            return false;
+        }
+
+        bool was = available_;
+        available_ = true;
+        warned_    = false;
+        if (was) return true;
+
+        bool ha     = json_find_bool(body, "ha_discovery",  false);
+        bool broker = json_find_bool(body, "mqtt_connected", false);
+        fprintf(stderr, "[mqtt] connected to ingest (broker=%s, ha_discovery=%s)\n",
+                broker ? "true" : "false", ha ? "true" : "false");
+
+        if (ha) declare_entities();
+        else fprintf(stderr, "[mqtt] Home Assistant discovery is disabled on the "
+                             "receiver — publishing data only\n");
+        return true;
+    }
+
+    void unavailable(const char *fmt, ...) __attribute__((format(printf, 2, 3)))
+    {
+        available_ = false;
+        if (warned_) return;
+        warned_ = true;
+
+        char buf[256];
+        va_list ap;
+        va_start(ap, fmt);
+        vsnprintf(buf, sizeof(buf), fmt, ap);
+        va_end(ap);
+        fprintf(stderr, "[mqtt] %s\n", buf);
+    }
+
+    /* ---------------- Home Assistant ---------------- */
+
+    /* One declaration. Every entity reads the retained summary topic and is
+     * told apart by entity_key, so a single publish updates all of them. */
+    void declare(const std::string &entity_key,
+                 const std::string &component,
+                 const std::string &name,
+                 const std::string &value_template,
+                 const std::string &extra = "")
+    {
+        std::string j = "{";
+        j += "\"sub_topic\":\"summary\"";
+        j += ",\"entity_key\":\""  + entity_key + "\"";
+        j += ",\"component\":\""   + component  + "\"";
+        j += ",\"name\":\""        + json_escape(name) + "\"";
+        j += ",\"value_template\":\"" + json_escape(value_template) + "\"";
+        if (!extra.empty()) j += "," + extra;
+        j += ",\"addon_version\":\"" + std::string(MQTT_ADDON_VERSION) + "\"";
+        j += ",\"addon_model\":\""   + std::string(MQTT_ADDON_MODEL)   + "\"";
+        j += "}";
+
+        std::string resp;
+        long code = http_post_json(base_ + "/discovery", j, resp);
+        if (code >= 400) {
+            fprintf(stderr, "[mqtt] declare %s rejected (%ld): %s\n",
+                    entity_key.c_str(), code, resp.c_str());
+            return;
+        }
+        declared_++;
+    }
+
+    void declare_entities()
+    {
+        declared_ = 0;
+
+        declare("messages_total", "sensor", "Messages Received",
+                "{{ value_json.messages_total }}",
+                "\"unit_of_measurement\":\"messages\","
+                "\"state_class\":\"total_increasing\","
+                "\"icon\":\"mdi:message-text\"");
+
+        declare("messages_hour", "sensor", "Messages (Last Hour)",
+                "{{ value_json.messages_last_hour }}",
+                "\"unit_of_measurement\":\"messages\","
+                "\"state_class\":\"measurement\","
+                "\"icon\":\"mdi:message-clock\"");
+
+        /* State is the message id (e.g. "EA02"); the decoded text and the rest
+         * of the metadata ride along as attributes. */
+        declare("last_message", "sensor", "Last Message",
+                "{{ value_json.last_message_id | default('', true) }}",
+                "\"json_attributes_template\":\""
+                + json_escape("{{ value_json.last_message_detail | default({}, true) | tojson }}")
+                + "\",\"icon\":\"mdi:script-text\"");
+
+        declare("last_subject", "sensor", "Last Subject",
+                "{{ value_json.last_subject_name | default('', true) }}",
+                "\"icon\":\"mdi:tag-text\"");
+
+        declare("last_station", "sensor", "Last Station",
+                "{{ value_json.last_station | default('', true) }}",
+                "\"icon\":\"mdi:radio-tower\"");
+
+        declare("last_message_utc", "sensor", "Last Message Time",
+                "{{ value_json.last_message_utc | default('', true) }}",
+                "\"device_class\":\"timestamp\",\"icon\":\"mdi:clock-outline\"");
+
+        /* NAVTEX lives on 490/518/4209.5 kHz, so kHz is the natural unit.
+         * No state_class: this is a current reading, not a series worth
+         * accumulating long-term statistics over. */
+        declare("last_frequency", "sensor", "Last Frequency",
+                "{{ value_json.last_frequency_khz | default('', true) }}",
+                "\"unit_of_measurement\":\"kHz\","
+                "\"device_class\":\"frequency\","
+                "\"icon\":\"mdi:sine-wave\"");
+
+        declare("last_snr", "sensor", "Last Message SNR",
+                "{{ value_json.last_snr_db | default('', true) }}",
+                "\"unit_of_measurement\":\"dB\","
+                "\"state_class\":\"measurement\","
+                "\"icon\":\"mdi:signal-variant\"");
+
+        declare("last_quality", "sensor", "Last Message Quality",
+                "{{ value_json.last_chars_clean_pct | default('', true) }}",
+                "\"unit_of_measurement\":\"%\","
+                "\"state_class\":\"measurement\","
+                "\"entity_category\":\"diagnostic\","
+                "\"icon\":\"mdi:check-decagram\"");
+
+        declare("receiver_link", "binary_sensor", "Receiver Link",
+                "{{ 'ON' if value_json.channels_connected > 0 else 'OFF' }}",
+                "\"device_class\":\"connectivity\","
+                "\"entity_category\":\"diagnostic\"");
+
+        fprintf(stderr, "[mqtt] declared %d Home Assistant entities\n", declared_);
+    }
+
+    /* ---------------- payload building ---------------- */
+
+    std::string summary_json()
+    {
+        std::lock_guard<std::mutex> lk(mu_);
+
+        /* Trim the rolling window before counting. */
+        auto cutoff = std::chrono::steady_clock::now() - std::chrono::hours(1);
+        while (!message_times_.empty() && message_times_.front() < cutoff)
+            message_times_.pop_front();
+
+        std::string j = "{";
+        j += "\"messages_total\":"     + std::to_string(total_messages_);
+        j += ",\"messages_last_hour\":" + std::to_string(message_times_.size());
+        j += ",\"dropped_events\":"    + std::to_string(dropped_);
+        j += ",\"channels_connected\":" + std::to_string(g_mqtt_channels_connected.load());
+
+        /* Per-frequency totals, e.g. {"518 kHz": 12, "490 kHz": 3} */
+        j += ",\"messages_by_frequency\":{";
+        bool first = true;
+        for (const auto &kv : per_freq_) {
+            if (!first) j += ",";
+            first = false;
+            j += "\"" + json_escape(kv.first) + "\":" + std::to_string(kv.second);
+        }
+        j += "}";
+
+        if (has_last_) {
+            const MqttMessageEvent &ev = last_;
+
+            /* Top-level fields, one per Home Assistant entity: a value_template
+             * reading a top-level key is far more legible than one reaching
+             * into a nested object. */
+            j += ",\"last_message_id\":\""  + json_escape(mqtt_msg_id(ev)) + "\"";
+            j += ",\"last_station\":\""     + json_escape(ev.station ? std::string(1, ev.station) : "") + "\"";
+            j += ",\"last_subject\":\""     + json_escape(ev.subject ? std::string(1, ev.subject) : "") + "\"";
+            j += ",\"last_subject_name\":\"" + json_escape(navtex_subject_name(ev.subject)) + "\"";
+            j += ",\"last_message_utc\":\"" + json_escape(ev.end_utc) + "\"";
+            j += ",\"last_frequency_hz\":"  + std::to_string(ev.freq_hz);
+            j += ",\"last_frequency_khz\":" + mqtt_fmt_double(ev.freq_hz / 1000.0, 1);
+            j += ",\"last_freq_label\":\""  + json_escape(ev.freq_label) + "\"";
+            j += ",\"last_char_count\":"    + std::to_string(ev.body.size());
+            if (ev.has_snr)
+                j += ",\"last_snr_db\":" + mqtt_fmt_double(ev.snr_db, 2);
+            if (ev.has_char_stats)
+                j += ",\"last_chars_clean_pct\":" + mqtt_fmt_double(ev.chars_clean_pct, 1);
+
+            /* Attribute bundle for the Last Message entity. The text is trimmed
+             * here only — Home Assistant keeps attributes in the recorder, and
+             * an 8 KiB body on every state change is not something to put
+             * there. The complete text is always on the messages topic. */
+            std::string preview = ev.text;
+            bool truncated = preview.size() > MQTT_TEXT_ATTR_MAX;
+            if (truncated) preview.resize(MQTT_TEXT_ATTR_MAX);
+
+            j += ",\"last_message_detail\":{";
+            j += "\"id\":\""           + json_escape(mqtt_msg_id(ev)) + "\"";
+            j += ",\"frequency\":\""   + json_escape(ev.freq_label) + "\"";
+            j += ",\"channel\":\""     + json_escape(ev.channel_name) + "\"";
+            j += ",\"subject\":\""     + json_escape(navtex_subject_name(ev.subject)) + "\"";
+            j += ",\"char_count\":"    + std::to_string(ev.body.size());
+            j += ",\"duration_s\":"    + std::to_string(ev.duration_s);
+            if (ev.has_snr) j += ",\"snr_db\":" + mqtt_fmt_double(ev.snr_db, 2);
+            j += ",\"truncated\":"     + std::string(truncated ? "true" : "false");
+            j += ",\"text\":\""        + json_escape(preview) + "\"";
+            j += "}";
+        }
+
+        j += "}";
+        return j;
+    }
+
+    /* ---------------- transport ---------------- */
+
+    void post(const std::string &sub_topic, const std::string &payload, bool retain)
+    {
+        std::string url = base_ + "/publish/" + sub_topic;
+        if (retain) url += "?retain=true";
+
+        std::string resp;
+        long code = http_post_json(url, payload, resp);
+
+        if (code < 0) {
+            /* The receiver may be restarting. Drop to dormant so the next
+             * summary re-probes (and re-declares) rather than logging per
+             * message. */
+            unavailable("publish %s failed — will retry", sub_topic.c_str());
+            return;
+        }
+        if (code < 300)  return;
+        if (code == 503) return;   /* broker down; transient, stay available */
+        if (code == 403) { unavailable("no longer a recognised addon — pausing MQTT"); return; }
+
+        fprintf(stderr, "[mqtt] publish %s: HTTP %ld: %s\n",
+                sub_topic.c_str(), code, resp.c_str());
+    }
+
+    void run_worker()
+    {
+        for (;;) {
+            MqttMessageEvent ev;
+            {
+                std::unique_lock<std::mutex> lk(mu_);
+                cv_.wait(lk, [&] { return !running_ || !queue_.empty(); });
+                if (!running_ && queue_.empty()) return;
+                ev = queue_.front();
+                queue_.pop_front();
+            }
+            post("messages", mqtt_message_json(ev), false);
+        }
+    }
+
+    void run_summary()
+    {
+        /* Publish once immediately so Home Assistant has values on subscribe
+         * rather than after the first interval. */
+        publish_summary();
+
+        for (;;) {
+            std::unique_lock<std::mutex> lk(mu_);
+            if (cv_.wait_for(lk, std::chrono::seconds(MQTT_SUMMARY_INTERVAL_S),
+                             [&] { return !running_; }))
+                return;
+            lk.unlock();
+            publish_summary();
+        }
+    }
+
+    void publish_summary()
+    {
+        /* Re-probe while dormant so the addon recovers on its own if the
+         * receiver was restarted, or had MQTT enabled, after we started. */
+        if (!available_ && !probe()) return;
+        post("summary", summary_json(), true);
+    }
+
+    std::string base_;
+    bool available_ = false;
+    bool warned_    = false;
+    int  declared_  = 0;
+
+    std::mutex              mu_;
+    std::condition_variable cv_;
+    bool                    running_ = false;
+    std::deque<MqttMessageEvent> queue_;
+    uint64_t                dropped_ = 0;
+
+    uint64_t                total_messages_ = 0;
+    std::deque<std::chrono::steady_clock::time_point> message_times_;
+    std::map<std::string, uint64_t> per_freq_;
+    MqttMessageEvent        last_;
+    bool                    has_last_ = false;
+
+    std::thread worker_;
+    std::thread summary_;
+};
+
+static MqttPublisher g_mqtt;
+
 /* ------------------------------------------------------------------ */
 /* Message-to-disk logging                                              */
 /* ------------------------------------------------------------------ */
@@ -833,6 +1441,69 @@ struct LatestMessage {
 static std::map<std::string, LatestMessage> g_latest_messages;
 static std::mutex                           g_latest_messages_mu;
 
+/* Build an MQTT event from a completed message and hand it to the publisher.
+ * Mirrors upsert_latest_message's reconstruction of the ZCZC…NNNN text so the
+ * two never disagree about what the message said. */
+static void mqtt_publish_completed(const ChannelContext &ctx,
+                                   const MsgParser      &mp,
+                                   const MsgMetrics     &metrics)
+{
+    if (mp.body.empty()) return;
+
+    MqttMessageEvent ev;
+    ev.freq_hz      = ctx.carrier_hz;
+    ev.freq_label   = ctx.label;
+    ev.channel_name = ctx.name;
+    ev.station      = mp.station;
+    ev.subject      = mp.subject;
+    ev.serial       = mp.serial;
+    /* Sanitised at the boundary rather than at each use, so every consumer of
+     * the event gets UTF-8-safe text. */
+    ev.body         = mqtt_sanitise_text(mp.body);
+    ev.start_utc    = metrics.start_utc;
+    ev.end_utc      = metrics.end_utc;
+
+    if (mp.station && mp.subject && mp.serial >= 0) {
+        char hdr[32];
+        snprintf(hdr, sizeof(hdr), "ZCZC %c%c%02d\n", mp.station, mp.subject, mp.serial);
+        ev.text = hdr;
+    } else if (mp.station && mp.subject) {
+        ev.text = std::string("ZCZC ") + mp.station + mp.subject + "\n";
+    } else {
+        ev.text = "ZCZC\n";
+    }
+    ev.text += ev.body;   /* already sanitised */
+    ev.text += "NNNN\n";
+
+    if (!metrics.start_utc.empty() && !metrics.end_utc.empty()) {
+        struct tm t0 {}, t1 {};
+        strptime(metrics.start_utc.c_str(), "%Y-%m-%dT%H:%M:%SZ", &t0);
+        strptime(metrics.end_utc.c_str(),   "%Y-%m-%dT%H:%M:%SZ", &t1);
+        time_t e0 = timegm(&t0), e1 = timegm(&t1);
+        if (e1 > e0) ev.duration_s = (int)(e1 - e0);
+    }
+
+    if (metrics.sq_sample_count > 0) {
+        double avg_bb = metrics.sum_bb_power      / metrics.sq_sample_count;
+        double avg_nd = metrics.sum_noise_density / metrics.sq_sample_count;
+        double snr    = avg_bb - avg_nd;
+        if (std::isfinite(snr)) {
+            ev.snr_db  = snr;
+            ev.has_snr = true;
+        }
+    }
+
+    uint64_t total = metrics.sum_chars_clean + metrics.sum_chars_fec + metrics.sum_chars_failed;
+    if (total > 0) {
+        ev.chars_clean_pct  = 100.0 * metrics.sum_chars_clean  / total;
+        ev.chars_fec_pct    = 100.0 * metrics.sum_chars_fec    / total;
+        ev.chars_failed_pct = 100.0 * metrics.sum_chars_failed / total;
+        ev.has_char_stats   = true;
+    }
+
+    g_mqtt.publish_message(ev);
+}
+
 static void upsert_latest_message(const ChannelContext &ctx,
                                   const MsgParser      &mp,
                                   const MsgMetrics     &metrics)
@@ -967,6 +1638,9 @@ static ssize_t ws_cookie_write(void *cookie, const char *buf, size_t size)
                 ctx->msg_metrics.end_utc = utc_iso8601_now();
                 save_message(*ctx, ctx->msg_parser, ctx->msg_metrics);
                 upsert_latest_message(*ctx, ctx->msg_parser, ctx->msg_metrics);
+                /* Queued, not sent inline: this runs on the audio callback
+                 * thread, where a stalled HTTP request would drop samples. */
+                mqtt_publish_completed(*ctx, ctx->msg_parser, ctx->msg_metrics);
                 ctx->msg_metrics.reset();
             }
         }
@@ -1075,14 +1749,14 @@ static void run_channel(ChannelContext *ctx, const std::string &base_url)
 
             case ix::WebSocketMessageType::Open:
                 fprintf(stderr, "[ch%d] WebSocket connected\n", ctx->channel_id);
-                connected = true;
+                if (!connected.exchange(true)) g_mqtt_channels_connected++;
                 ws.sendText("{\"type\":\"get_status\"}");
                 break;
 
             case ix::WebSocketMessageType::Close:
                 fprintf(stderr, "[ch%d] WebSocket closed: %s\n",
                         ctx->channel_id, msg->closeInfo.reason.c_str());
-                connected    = false;
+                if (connected.exchange(false)) g_mqtt_channels_connected--;
                 session_done = true;
                 break;
 
@@ -1184,6 +1858,13 @@ static void run_channel(ChannelContext *ctx, const std::string &base_url)
 
         ws.stop();
         keepalive.join();
+
+        /* Release this channel's slot in the connected count however the
+         * session ended. A Close event already did it; an Error, a dropped
+         * socket, or any other exit path did not, and `connected` goes out of
+         * scope on the next loop iteration — so without this the gauge would
+         * drift upward on every reconnect. exchange() makes it idempotent. */
+        if (connected.exchange(false)) g_mqtt_channels_connected--;
 
         fprintf(stderr, "[ch%d] reconnecting in 10 seconds...\n", ctx->channel_id);
         for (int i = 10; i > 0; --i) {
@@ -2261,6 +2942,12 @@ int main(int argc, const char **argv)
         }).detach();
     }
 
+    /* ---- MQTT publishing via UberSDR's addon ingest port ----
+     * Always on, no configuration: the endpoint is derived from base_url.
+     * Started before the channels so nothing can complete a message while the
+     * publisher is still coming up. */
+    g_mqtt.start(base_url);
+
     /* ---- Spawn one thread per channel ---- */
     std::vector<std::thread> channel_threads;
     channel_threads.reserve(channels.size());
@@ -2272,6 +2959,7 @@ int main(int argc, const char **argv)
         t.join();
 
     /* Cleanup (unreachable in normal operation) */
+    g_mqtt.stop();
     web_server.stop();
     for (auto &ctx : channels) {
         delete ctx.decoder;
