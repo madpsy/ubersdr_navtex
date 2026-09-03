@@ -7,8 +7,11 @@
  */
 
 #pragma once
+#include <cstdio>
 #include <string>
 #include <vector>
+
+#include "navtex_snr.h"
 
 /* Forward declaration — ChannelContext is defined in the including TU */
 struct ChannelContext;
@@ -31,6 +34,23 @@ static std::string make_html_page(const std::string &sdr_url,
         ch_labels_js += "\"" + freq_dir + "\"";
     }
     ch_labels_js += "];\n";
+
+    /* ---- SNR scale JS, generated from navtex_snr.h ----
+     * Emitted rather than written into the page as literals so the page and
+     * the C++ that classifies stored records cannot disagree.  See
+     * navtex_snr.h for how these numbers were measured. */
+    std::string snr_js;
+    {
+        char b[512];
+        snprintf(b, sizeof(b),
+                 "  const SNR_GOOD_DB     = %.2f;\n"
+                 "  const SNR_WARN_DB     = %.2f;\n"
+                 "  const SNR_BAR_MIN_DB  = %.2f;\n"
+                 "  const SNR_BAR_SPAN_DB = %.2f;\n",
+                 navtex_snr_good_db(), navtex_snr_warn_db(),
+                 navtex_snr_bar_min_db(), NAVTEX_SNR_BAR_SPAN_DB);
+        snr_js = b;
+    }
 
     /* ---- Tab buttons (individual channels) ---- */
     std::string tab_buttons;
@@ -66,7 +86,7 @@ static std::string make_html_page(const std::string &sdr_url,
             "    <div class=\"stats-bar\">\n"
             "      <div class=\"stat\"><span class=\"stat-label\">Signal (dBFS)</span>"
                    "<span class=\"stat-value\" id=\"bb-val-" + s + "\">&mdash;</span></div>\n"
-            "      <div class=\"stat\"><span class=\"stat-label\">Noise (dBFS/Hz)</span>"
+            "      <div class=\"stat\"><span class=\"stat-label\">Noise (dBFS)</span>"
                    "<span class=\"stat-value\" id=\"nd-val-" + s + "\">&mdash;</span></div>\n"
             "      <div class=\"stat\"><span class=\"stat-label\">Sample Rate</span>"
                    "<span class=\"stat-value\" id=\"rate-val-" + s + "\">&mdash;</span></div>\n"
@@ -987,6 +1007,39 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
   const NUM_CHANNELS = )HTML" + std::to_string(channels.size()) + R"HTML(;
 )HTML" + ch_labels_js + R"HTML(
 
+  /* ---------------------------------------------------------------
+   * SNR scale.
+   *
+   * GENERATED from src/navtex_snr.h — do not write a threshold here as
+   * a literal.  Four hand-written copies of the good/warn boundaries and
+   * a fifth for the bar range used to live in this file, and audio
+   * protocol version 4 moved the scale under all of them at once.  They
+   * come from one calibration in that header now, so the next change to
+   * it moves every one of them together.
+   * --------------------------------------------------------------- */
+)HTML" + snr_js + R"HTML(
+
+  /* 'good' / 'warn' / 'bad', or 'dim' when there is no reading. */
+  function snrCls(snr) {
+    if (snr === null || snr === undefined || !isFinite(snr)) return 'dim';
+    return snr > SNR_GOOD_DB ? 'good' : snr > SNR_WARN_DB ? 'warn' : 'bad';
+  }
+  /* The same classes, but blank rather than 'dim' for a missing reading —
+   * the metrics modal styles an unclassed value itself. */
+  function snrClass(snr) {
+    if (snr === null || snr === undefined || !isFinite(snr)) return '';
+    return snrCls(snr);
+  }
+  /* Fill percentage for the SNR bar, clamped to the track. */
+  function snrBarPct(snr) {
+    if (snr === null || snr === undefined || !isFinite(snr)) return 0;
+    return Math.max(0, Math.min(100, (snr - SNR_BAR_MIN_DB) / SNR_BAR_SPAN_DB * 100));
+  }
+  /* Bar colour, from the same two boundaries as the text. */
+  function snrBarColour(snr) {
+    return snr > SNR_GOOD_DB ? '#4caf50' : snr > SNR_WARN_DB ? '#ffeb3b' : '#e94560';
+  }
+
   /* Per-channel first-char flag */
   const firstChar = Array(NUM_CHANNELS).fill(true);
 
@@ -1060,11 +1113,6 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
       byFreq[m.freq].push(m);
     });
 
-    function snrCls(snr) {
-      if (snr === null || snr === undefined) return 'dim';
-      return snr > 45 ? 'good' : snr > 35 ? 'warn' : 'bad';
-    }
-
     var html = '';
     freqOrder.forEach(function(freq) {
       var rows = byFreq[freq];
@@ -1083,14 +1131,16 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
         var tsDisp = (m.timestamp || '').replace('T',' ').replace('Z',' UTC');
         var snrDisp = (m.snr_db !== null && m.snr_db !== undefined)
                     ? Number(m.snr_db).toFixed(1) + ' dB' : '\u2014';
-        var snrClass = 'lt-snr ' + snrCls(m.snr_db);
+        /* Not named snrClass: that is a page-scope function now, and a var of
+         * the same name would shadow it for this whole callback. */
+        var snrCellCls = 'lt-snr ' + snrCls(m.snr_db);
 
         html += '<tr>'
               + '<td class="lt-station">' + (m.station || '\u2014') + '</td>'
               + '<td class="lt-subject">' + subDisp + '</td>'
               + '<td class="lt-serial">'  + serialDisp + '</td>'
               + '<td class="lt-ts">'      + tsDisp + '</td>'
-              + '<td class="' + snrClass + '">' + snrDisp + '</td>'
+              + '<td class="' + snrCellCls + '">' + snrDisp + '</td>'
               + '<td><button class="latest-view-btn" data-text="' + encodeURIComponent(m.text || '')
               + '" data-title="' + encodeURIComponent(freq + ' \u00b7 ' + (m.station||'') + (m.subject||'') + (serialDisp !== '\u2014' ? serialDisp : ''))
               + '">View</button></td>'
@@ -1426,10 +1476,9 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
     if (s.bb !== undefined && s.nd !== undefined && isFinite(s.bb) && isFinite(s.nd)) {
       const snr = s.bb - s.nd;
       snrVal.textContent = snr.toFixed(1) + ' dB';
-      snrVal.className = 'stat-value ' + (snr > 45 ? 'good' : snr > 35 ? 'warn' : 'bad');
-      const snrPct = Math.max(0, Math.min(100, (snr - 25) / 35 * 100));
-      snrFill.style.width = snrPct + '%';
-      snrFill.style.background = snr > 45 ? '#4caf50' : snr > 35 ? '#ffeb3b' : '#e94560';
+      snrVal.className = 'stat-value ' + snrCls(snr);
+      snrFill.style.width = snrBarPct(snr) + '%';
+      snrFill.style.background = snrBarColour(snr);
     } else if (s.bb !== undefined) {
       snrVal.textContent = '\u2014'; snrVal.className = 'stat-value';
       snrFill.style.width = '0%';
@@ -2082,11 +2131,6 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
       pagDiv.style.display  = 'none';
     }
 
-    /* SNR colour helper (matches modal panel thresholds) */
-    function snrCls(snr) {
-      if (snr === null || snr === undefined) return 'dim';
-      return snr > 45 ? 'good' : snr > 35 ? 'warn' : 'bad';
-    }
     function fmtDur(s) {
       if (s === null || s === undefined) return '—';
       const m = Math.floor(s / 60), sec = s % 60;
@@ -2160,6 +2204,11 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
       tdSnr.className = 'hist-snr' + (isRaw ? ' dim' : ' ' + snrCls(m.snr));
       if (!isRaw && m.snr !== null && m.snr !== undefined) {
         tdSnr.textContent = Number(m.snr).toFixed(1) + ' dB';
+        /* Recorded before audio protocol version 4, so the stored figure was on
+         * the old noise-density scale and has been converted for display. */
+        if (m.snr_rescaled)
+          tdSnr.title = 'Recorded on the pre-v4 noise-density scale; '
+                      + 'converted for comparison with newer messages.';
       } else {
         tdSnr.textContent = '—';
       }
@@ -2216,10 +2265,6 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
       return (v === null || v === undefined) ? '\u2014' : Number(v).toFixed(digits !== undefined ? digits : 1);
     }
     function fmtPct(v) { return (v === null || v === undefined) ? '\u2014' : Number(v).toFixed(1) + '%'; }
-    function snrClass(snr) {
-      if (snr === null || snr === undefined) return '';
-      return snr > 45 ? 'good' : snr > 35 ? 'warn' : 'bad';
-    }
     function fecClass(pct) {
       if (pct === null || pct === undefined) return '';
       return pct > 30 ? 'warn' : 'good';
@@ -2273,7 +2318,7 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
       + (m.avg_noise_density_dbfs !== null && m.avg_noise_density_dbfs !== undefined
         ? '<div class="mm-item">'
             + '<span class="mm-label">Avg Noise</span>'
-            + '<span class="mm-value">' + fmt(m.avg_noise_density_dbfs, 1) + ' dBFS/Hz</span>'
+            + '<span class="mm-value">' + fmt(m.avg_noise_density_dbfs, 1) + ' dBFS</span>'
           + '</div>'
         : '')
       + (m.avg_chars_clean_pct !== null && m.avg_chars_clean_pct !== undefined

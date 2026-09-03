@@ -109,7 +109,7 @@ IMAGE=myrepo/ubersdr_navtex:dev ./docker.sh build
 
 ### Local build (no Docker)
 
-Requires: `build-essential`, `cmake`, `libzstd-dev`, `libcurl4-openssl-dev`, `libssl-dev`, `pkg-config`
+Requires: `build-essential`, `cmake`, `libcurl4-openssl-dev`, `libssl-dev`, `pkg-config`
 
 IXWebSocket is cloned automatically from GitHub if not present.
 
@@ -243,9 +243,56 @@ cmake --build build --target mqtt_selftest && ./build/src/mqtt_selftest
 
 Covers endpoint derivation, the text sanitiser, message-payload JSON (including
 hostile input: embedded quotes, backslashes and invalid UTF-8), subject decoding
-and the health-response parser.
+and the health-response parser — and the SNR scale: that a measured strong
+signal classifies as good, that the idle floor classifies as bad, that the
+thresholds reach the generated page, and that a message recorded before the
+audio protocol version 4 migration is converted onto the current scale rather
+than read 34 dB high.
+
+Audio protocol version 4 conformance — decodes packet streams the **server's**
+encoder produced and compares the SHA-256 of the decoded samples:
+
+```bash
+cmake --build build --target pcmv4_conformance
+ctest --test-dir build --output-on-failure
+```
+
+Or without configuring the project at all (`src/pcm_v4.hpp` is header-only, so
+this needs nothing but a C++ compiler):
+
+```bash
+./test/run.sh
+```
+
+This matters more than it looks. The version 4 predictor is backward adaptive:
+the encoder and `src/pcm_v4.hpp` derive their filter taps independently from the
+samples already seen and never exchange a coefficient, so an arithmetic
+difference between the two returns plausible-sounding noise rather than an
+error. `test/testdata/pcmv4_stream.bin` covers mono audio, silent packets
+carrying no body, an escape to verbatim samples and a sample-rate change;
+`pcmv4_rice_edge.bin` covers a Rice codeword whose unary run is exactly 63 bits,
+where a 64-bit shift is zero in Go and undefined in C++.
 
 ---
+
+## SNR scale
+
+The decoder speaks audio protocol version 4, in which the server sends the noise
+figure as a **power in the demodulator passband (dBFS)**. Versions 1–3 sent the
+noise **density** (dBFS/Hz), which is `10*log10(passband)` lower — 34.2 dB on the
+2650 Hz filter this program requests — so every SNR shown here reads that much
+lower than it did before, for the same signal.
+
+Measured on 490 and 518 kHz (5 minutes each): an idle channel sits near −6 dB and
+a real NAVTEX transmission around +16 dB, peaking at +25. The good/warn
+boundaries and the SNR bar range are set from those distributions and live in one
+place, `src/navtex_snr.h`; the web page's copies are generated from it.
+
+Messages saved before the migration are stored on the old scale. They are
+converted when the history API reads them, are marked as converted in what it
+returns, and the history table says so on hover — so old and new messages are
+comparable in one column. Sidecars written from now on carry an
+`audio_protocol_version` stamp so no future migration has to infer their scale.
 
 ## Ports
 

@@ -24,18 +24,20 @@
  * The server URL must use http:// or https://.  The WebSocket connection
  * is made to the same host/port using ws:// or wss:// respectively.
  *
- * Audio format requested: pcm-zstd, version 2.
- * The server delivers 12 kHz mono signed 16-bit big-endian PCM inside
- * zstd-compressed WebSocket binary frames.
+ * Audio format requested: pcm-zstd, version 4.
+ * The server delivers 12 kHz mono signed 16-bit PCM, losslessly coded by the
+ * version 4 predictive codec (see src/pcm_v4.hpp).  The query parameter is
+ * still called "pcm-zstd" — only the version changed; version 4 carries no
+ * zstd at all.
  *
  * Protocol sequence (per channel):
  *   1. POST http(s)://host:port/connection  {"user_session_id":"<uuid>"}
  *   2. GET  http(s)://host:port/api/description  (informational, channel 0 only)
  *   3. WebSocket ws(s)://host:port/ws?frequency=<dial>&mode=usb
- *              &format=pcm-zstd&version=2&user_session_id=<uuid>
+ *              &format=pcm-zstd&version=4&user_session_id=<uuid>
  *   4. Send {"type":"get_status"} on open
  *   5. Keepalive {"type":"ping"} every 30 s
- *   6. On binary frame: zstd-decompress -> strip header -> byteswap -> process_data()
+ *   6. On binary frame: PCMv4StreamDecoder::decode -> process_data()
  *
  * Web UI:
  *   An embedded HTTP + WebSocket server runs on --web-port (default 6040).
@@ -46,6 +48,7 @@
  */
 
 #include "navtex_rx.h"
+#include "navtex_snr.h"
 
 #include <algorithm>
 #include <atomic>
@@ -68,12 +71,12 @@
 #include <thread>
 #include <vector>
 
-#include <arpa/inet.h>   /* ntohs */
 #include <dirent.h>      /* opendir/readdir */
 #include <sys/stat.h>    /* mkdir, stat */
 
 #include <curl/curl.h>
-#include <zstd.h>
+
+#include "pcm_v4.hpp"
 
 #include <ixwebsocket/IXWebSocket.h>
 #include <ixwebsocket/IXNetSystem.h>
@@ -182,96 +185,92 @@ static long http_get(const std::string &url, std::string &out_body)
 }
 
 /* ------------------------------------------------------------------ */
-/* PCM-zstd frame decoder                                              */
+/* Audio protocol version 4 frame decoder                              */
 /* ------------------------------------------------------------------ */
-static const uint16_t MAGIC_FULL    = 0x5043;
-static const uint16_t MAGIC_MINIMAL = 0x504D;
-static const size_t   FULL_HDR_V1  = 29;
-static const size_t   FULL_HDR_V2  = 37;
-static const size_t   MIN_HDR      = 13;
+
+/*
+ * Version 4 replaced the zstd wrapper of versions 1-3 with a predictive
+ * lossless codec and a variable-length header, so there is no compression
+ * library here at all: pcm_v4.hpp is header-only and self-contained.
+ *
+ * The header carries the sample rate and the channel count itself, on every
+ * resynchronisation packet — and a resync is the first packet any decoder will
+ * accept — so the stream is self-describing from the first frame that gets
+ * through.
+ */
 
 struct PcmMeta {
     uint32_t sample_rate        = 0;
     uint8_t  channels           = 0;
-    float    baseband_power     = 0.0f;
-    float    noise_density      = 0.0f;
+    float    baseband_power     = 0.0f;  /* dBFS */
+    /* Version 4 reports the noise POWER in the passband in dBFS.  Versions 1-3
+     * sent the dBFS/Hz DENSITY, which is 10*log10(2650) = 34.2 dB lower -- see
+     * navtex_snr.h.  The stored sidecar key is still called
+     * avg_noise_density_dbfs, for compatibility with records already on disk. */
+    float    noise_dbfs         = 0.0f;  /* dBFS, passband noise power */
     bool     has_signal_quality = false;
+
+    /* Consecutive decode failures, so a desynchronised stream reports itself
+     * once rather than once per packet on every channel.  Cleared by the next
+     * packet that decodes. */
+    unsigned long decode_errors = 0;
 };
 
-static inline uint32_t read_le32(const uint8_t *p)
+/*
+ * Decode one WebSocket binary frame.
+ *
+ * `dec` holds the stream's adaptation state and belongs to exactly one
+ * WebSocket: the predictor is backward adaptive, so every packet has to reach
+ * it (even one whose samples are then dropped) and it has to be reset when a
+ * new socket opens.
+ *
+ * Fills meta from the packet header and the samples into pcm_le, host-order
+ * int16.  Unlike versions 1-3 the codec emits host order already, so there is
+ * no byte swap.
+ */
+static bool decode_pcm_v4_frame(ubersdr::PCMv4StreamDecoder &dec,
+                                const void *frame, size_t frame_len,
+                                PcmMeta &meta,
+                                std::vector<int16_t> &pcm_le)
 {
-    return (uint32_t)p[0] | ((uint32_t)p[1]<<8) |
-           ((uint32_t)p[2]<<16) | ((uint32_t)p[3]<<24);
-}
-static inline uint16_t read_le16(const uint8_t *p)
-{
-    return (uint16_t)p[0] | ((uint16_t)p[1]<<8);
-}
+    const uint8_t *p = static_cast<const uint8_t *>(frame);
 
-static bool decode_pcm_zstd_frame(const void *compressed, size_t compressed_len,
-                                   std::vector<uint8_t> &decomp_buf,
-                                   PcmMeta &meta,
-                                   std::vector<int16_t> &pcm_le)
-{
-    size_t frame_size = ZSTD_getFrameContentSize(compressed, compressed_len);
-    if (frame_size == ZSTD_CONTENTSIZE_ERROR ||
-        frame_size == ZSTD_CONTENTSIZE_UNKNOWN)
-        frame_size = compressed_len * 8;
-
-    if (decomp_buf.size() < frame_size)
-        decomp_buf.resize(frame_size);
-
-    size_t actual = ZSTD_decompress(decomp_buf.data(), decomp_buf.size(),
-                                    compressed, compressed_len);
-    if (ZSTD_isError(actual)) {
-        fprintf(stderr, "zstd error: %s\n", ZSTD_getErrorName(actual));
+    if (ubersdr::PCMv4StreamDecoder::isZstdFrame(p, frame_len)) {
+        /* A server older than 0.1.63 clamps the requested version to 1-3 and
+         * answers with a zstd frame rather than refusing.  Say so plainly
+         * instead of reporting "bad magic" on every packet. */
+        if (++meta.decode_errors == 1)
+            fprintf(stderr, "pcm v4: server sent a version 1-3 zstd frame; "
+                            "it is older than 0.1.63 and cannot serve version 4\n");
         return false;
     }
 
-    const uint8_t *p   = decomp_buf.data();
-    const uint8_t *end = p + actual;
-    if (actual < 2) return false;
-
-    uint16_t magic    = read_le16(p);
-    size_t   hdr_size = 0;
-
-    if (magic == MAGIC_FULL) {
-        if (actual < 3) return false;
-        uint8_t version = p[2];
-        hdr_size = (version >= 2) ? FULL_HDR_V2 : FULL_HDR_V1;
-        if (actual < hdr_size) return false;
-
-        meta.sample_rate = read_le32(p + 20);
-        meta.channels    = p[24];
-
-        if (version >= 2) {
-            uint32_t bb_bits, nd_bits;
-            bb_bits = (uint32_t)p[25]|((uint32_t)p[26]<<8)|((uint32_t)p[27]<<16)|((uint32_t)p[28]<<24);
-            nd_bits = (uint32_t)p[29]|((uint32_t)p[30]<<8)|((uint32_t)p[31]<<16)|((uint32_t)p[32]<<24);
-            memcpy(&meta.baseband_power, &bb_bits, 4);
-            memcpy(&meta.noise_density,  &nd_bits, 4);
-            meta.has_signal_quality = true;
-        } else {
-            meta.has_signal_quality = false;
-        }
-    } else if (magic == MAGIC_MINIMAL) {
-        hdr_size = MIN_HDR;
-        if (actual < hdr_size) return false;
-    } else {
-        fprintf(stderr, "unknown PCM magic: 0x%04x\n", magic);
+    ubersdr::PCMv4Header h;
+    std::string err;
+    if (!dec.decode(p, frame_len, h, err)) {
+        ++meta.decode_errors;
+        if (meta.decode_errors == 1 || meta.decode_errors % 500 == 0)
+            fprintf(stderr, "pcm v4: %s (%lu consecutive)\n",
+                    err.c_str(), meta.decode_errors);
         return false;
     }
+    meta.decode_errors = 0;
 
-    const uint8_t *pcm_start = p + hdr_size;
-    size_t         pcm_bytes = (size_t)(end - pcm_start);
-    size_t         n_samples = pcm_bytes / 2;
+    meta.sample_rate = (uint32_t)h.sampleRate;
+    meta.channels    = (uint8_t)h.channels;
+    meta.baseband_power = h.basebandPower;
+    meta.noise_dbfs     = h.noise;
+    /* -999 is the "radiod reported nothing" sentinel.  Quality rides every
+     * resynchronisation packet, and a resync is the first packet the decoder
+     * accepts, so this is set from real data from the first frame on. */
+    meta.has_signal_quality = (h.basebandPower > -998.0f);
 
-    pcm_le.resize(n_samples);
-    for (size_t i = 0; i < n_samples; i++) {
-        int16_t be;
-        memcpy(&be, pcm_start + i * 2, 2);
-        pcm_le[i] = (int16_t)ntohs((uint16_t)be);
+    const int16_t *s = dec.samples();
+    if (s == nullptr || h.sampleCount <= 0) {
+        pcm_le.clear();
+        return true;
     }
+    pcm_le.assign(s, s + h.sampleCount);
     return true;
 }
 
@@ -544,8 +543,14 @@ struct ChannelContext {
     bool  cached_has_sq    = false;
 
     PcmMeta              meta;
-    std::vector<uint8_t> decomp_buf;
     std::vector<int16_t> pcm_le;
+    bool                 warned_channels = false;
+
+    /* Version 4 stream state.  Backward adaptive, so it belongs to one
+     * WebSocket and is reset at the top of every session in run_channel();
+     * carrying the previous session's taps over would decode the first packets
+     * of the new one as noise. */
+    ubersdr::PCMv4StreamDecoder v4;
 
     /* Per-message signal-quality accumulator */
     MsgMetrics msg_metrics;
@@ -1352,6 +1357,14 @@ static void save_message(const ChannelContext &ctx, const MsgParser &mp,
     }
 
     fprintf(jf, "{\n");
+    /* Which scale the SNR and noise figures below are on.  A sidecar without
+     * these keys predates audio protocol version 4 and is on the old
+     * noise-DENSITY scale; sidecar_normalise_scale() converts one on the way
+     * back out.  Nothing but this program writes these files, so the absence of
+     * the stamp is a reliable marker rather than a guess. */
+    fprintf(jf, "  \"" NAVTEX_SIDECAR_VERSION_KEY "\": %d,\n", NAVTEX_AUDIO_PROTOCOL_VERSION);
+    fprintf(jf, "  \"noise_scale\": \"passband_power\",\n");
+    fprintf(jf, "  \"noise_bandwidth_hz\": %.0f,\n", NAVTEX_PASSBAND_HZ);
     fprintf(jf, "  \"freq_hz\": %ld,\n",      ctx.carrier_hz);
     fprintf(jf, "  \"freq_label\": \"%s\",\n", json_escape(ctx.label).c_str());
     fprintf(jf, "  \"station\": \"%c\",\n",    mp.station ? mp.station : '?');
@@ -1674,7 +1687,7 @@ static void run_channel(ChannelContext *ctx, const std::string &base_url)
     snprintf(ws_url, sizeof(ws_url),
              "%s/ws?frequency=%ld&mode=usb"
              "&bandwidthLow=50&bandwidthHigh=2700"
-             "&format=pcm-zstd&version=2"
+             "&format=pcm-zstd&version=4"
              "&user_session_id=%s",
              ws_base.c_str(), ctx->dial_hz,
              make_uuid4().c_str()); /* fresh UUID per reconnect attempt */
@@ -1719,7 +1732,7 @@ static void run_channel(ChannelContext *ctx, const std::string &base_url)
         snprintf(ws_url, sizeof(ws_url),
                  "%s/ws?frequency=%ld&mode=usb"
                  "&bandwidthLow=50&bandwidthHigh=2700"
-                 "&format=pcm-zstd&version=2"
+                 "&format=pcm-zstd&version=4"
                  "&user_session_id=%s",
                  ws_base.c_str(), ctx->dial_hz, session_id.c_str());
 
@@ -1733,6 +1746,11 @@ static void run_channel(ChannelContext *ctx, const std::string &base_url)
         new (ctx->decoder) navtex_rx(ctx->current_sample_rate,
                                      false, false,
                                      ctx->broadcast_file);
+
+        /* Same for the wire decoder: a new socket is a new version 4 stream,
+         * with its own metadata resynchronisation and its own predictor
+         * adaptation.  Reset before any frame of it can arrive. */
+        ctx->v4.reset();
 
         std::atomic<bool> connected{false};
         std::atomic<bool> session_done{false};
@@ -1768,11 +1786,18 @@ static void run_channel(ChannelContext *ctx, const std::string &base_url)
 
             case ix::WebSocketMessageType::Message:
                 if (msg->binary) {
-                    if (!decode_pcm_zstd_frame(msg->str.data(), msg->str.size(),
-                                               ctx->decomp_buf, ctx->meta, ctx->pcm_le))
+                    /* Every binary frame must reach the version 4 stream
+                     * decoder, even one whose samples are then dropped — it is
+                     * the only thing keeping this side's predictor in step with
+                     * the server's. */
+                    if (!decode_pcm_v4_frame(ctx->v4, msg->str.data(), msg->str.size(),
+                                             ctx->meta, ctx->pcm_le))
                         break;
 
-                    /* Recreate decoder if sample rate changed */
+                    /* Recreate decoder if sample rate changed.  On a version 4
+                     * stream the rate is authoritative from the first frame
+                     * that decodes, because that frame is a resynchronisation
+                     * packet and carries it. */
                     if (ctx->meta.sample_rate != 0 &&
                         (int)ctx->meta.sample_rate != ctx->current_sample_rate) {
                         fprintf(stderr, "[ch%d] sample rate changed to %u Hz — resetting decoder\n",
@@ -1784,6 +1809,22 @@ static void run_channel(ChannelContext *ctx, const std::string &base_url)
                                                      ctx->broadcast_file);
                     }
 
+                    /* mode=usb is mono, and the version 4 header says so on
+                     * every resynchronisation.  navtex_rx has no notion of
+                     * interleaving, so anything else would be fed to it as if
+                     * it were consecutive samples. */
+                    if (ctx->meta.channels != 1) {
+                        if (!ctx->warned_channels) {
+                            ctx->warned_channels = true;
+                            fprintf(stderr,
+                                    "[ch%d] server reports %u channels, not the mono "
+                                    "navtex_rx needs — dropping samples\n",
+                                    ctx->channel_id, (unsigned)ctx->meta.channels);
+                        }
+                        break;
+                    }
+                    ctx->warned_channels = false;
+
                     if (!ctx->pcm_le.empty()) {
                         ctx->decoder->process_data(ctx->pcm_le.data(),
                                                    (int)ctx->pcm_le.size());
@@ -1792,7 +1833,7 @@ static void run_channel(ChannelContext *ctx, const std::string &base_url)
 
                     if (ctx->meta.has_signal_quality) {
                         ctx->cached_bb_power  = ctx->meta.baseband_power;
-                        ctx->cached_noise_den = ctx->meta.noise_density;
+                        ctx->cached_noise_den = ctx->meta.noise_dbfs;
                         ctx->cached_has_sq    = true;
                     }
 
@@ -2098,6 +2139,102 @@ static std::string metrics_json(const std::string &log_dir)
     return j;
 }
 
+/* ------------------------------------------------------------------ */
+/* Stored metrics: reading records written on either SNR scale          */
+/* ------------------------------------------------------------------ */
+
+/*
+ * A log directory that survives the audio protocol version 4 upgrade holds
+ * sidecars from both scales in one field — see navtex_snr.h.  Records written
+ * from now on carry a version stamp; one without it is pre-migration, because
+ * nothing but save_message() has ever written these files.
+ *
+ * Both readers below funnel through here, so a stored SNR is converted in
+ * exactly one place and the browser never has to know which scale a record was
+ * written on.
+ */
+
+/* The raw text of a JSON value for `key` in a flat object, or "" if the key is
+ * absent or null.  A substring search, matching how these files are written —
+ * one key per line, no nesting. */
+static std::string sidecar_field(const std::string &sc, const std::string &key)
+{
+    auto p = sc.find("\"" + key + "\":");
+    if (p == std::string::npos) return "";
+    p = sc.find_first_not_of(" \t\r\n", p + key.size() + 3);
+    if (p == std::string::npos) return "";
+    if (sc[p] == 'n') return ""; /* null */
+    auto e = sc.find_first_of(",}\n", p);
+    return (e == std::string::npos) ? sc.substr(p) : sc.substr(p, e - p);
+}
+
+/* Is this a real JSON number?  Guards against "-nan" and "inf", which older
+ * sidecars can contain. */
+static bool sidecar_is_number(const std::string &s)
+{
+    if (s.empty()) return false;
+    for (char c : s)
+        if (!isdigit((unsigned char)c) && c != '-' && c != '.'
+                && c != 'e' && c != 'E' && c != '+')
+            return false;
+    return true;
+}
+
+/* A sidecar with no version stamp was written before the migration, so its
+ * noise figure is a density and its SNR is 10*log10(passband) too high. */
+static bool sidecar_is_legacy_scale(const std::string &sc)
+{
+    return sidecar_field(sc, NAVTEX_SIDECAR_VERSION_KEY).empty();
+}
+
+/* Replace the numeric value of `key` in place.  Returns false if the key is
+ * missing or not a number, leaving sc untouched. */
+static bool sidecar_set_number(std::string &sc, const std::string &key, double v)
+{
+    auto p = sc.find("\"" + key + "\":");
+    if (p == std::string::npos) return false;
+    auto vs = sc.find_first_not_of(" \t\r\n", p + key.size() + 3);
+    if (vs == std::string::npos) return false;
+    auto ve = sc.find_first_of(",}\n", vs);
+    if (ve == std::string::npos) return false;
+    if (!sidecar_is_number(sc.substr(vs, ve - vs))) return false;
+    char buf[64];
+    snprintf(buf, sizeof(buf), "%.2f", v);
+    sc.replace(vs, ve - vs, buf);
+    return true;
+}
+
+/* Put a legacy sidecar's figures onto the version 4 scale, and say so in the
+ * object so a reader can tell a converted record from a natively recorded one.
+ * The record's own origin version is reported truthfully; only the numbers
+ * move. */
+static std::string sidecar_normalise_scale(const std::string &sc)
+{
+    if (sc.empty() || !sidecar_is_legacy_scale(sc)) return sc;
+
+    std::string out = sc;
+
+    std::string snr_s   = sidecar_field(out, "avg_snr_db");
+    std::string noise_s = sidecar_field(out, "avg_noise_density_dbfs");
+    if (sidecar_is_number(snr_s))
+        sidecar_set_number(out, "avg_snr_db", navtex_snr_legacy_to_v4(atof(snr_s.c_str())));
+    if (sidecar_is_number(noise_s))
+        sidecar_set_number(out, "avg_noise_density_dbfs",
+                           navtex_noise_density_to_power(atof(noise_s.c_str())));
+
+    auto brace = out.find('{');
+    if (brace == std::string::npos) return out;
+    char stamp[256];
+    snprintf(stamp, sizeof(stamp),
+             "\n  \"" NAVTEX_SIDECAR_VERSION_KEY "\": 2,"
+             "\n  \"noise_scale\": \"passband_power\","
+             "\n  \"noise_bandwidth_hz\": %.0f,"
+             "\n  \"snr_rescaled_from_density\": true,",
+             NAVTEX_PASSBAND_HZ);
+    out.insert(brace + 1, stamp);
+    return out;
+}
+
 /* Recursively walk log_dir and collect .txt message files and .log raw files.
  * Returns a JSON array string, newest-first (sorted by filename path).
  * Each entry has a "type" field: "msg" for .txt files, "raw" for .log files.
@@ -2273,8 +2410,9 @@ static std::string history_list_json(const std::string &log_dir)
          * inline display in the history list. */
         bool has_metrics = false;
         std::string json_sidecar_path;
-        std::string inline_snr;      /* e.g. "45.8" or "" */
+        std::string inline_snr;      /* e.g. "11.6" or "" */
         std::string inline_duration; /* e.g. "132"  or "" */
+        bool        snr_rescaled = false; /* value converted from the old scale */
         if (!fe.is_raw) {
             json_sidecar_path = fe.full.substr(0, fe.full.size() - 4) + ".json";
             has_metrics = (json_sidecars.count(json_sidecar_path) > 0);
@@ -2290,18 +2428,15 @@ static std::string history_list_json(const std::string &log_dir)
                         sc.append(sbuf, sn);
                     fclose(sf);
 
-                    auto extract_num = [&](const std::string &key) -> std::string {
-                        auto p = sc.find("\"" + key + "\":");
-                        if (p == std::string::npos) return "";
-                        p = sc.find_first_not_of(" \t\r\n", p + key.size() + 3);
-                        if (p == std::string::npos) return "";
-                        if (sc[p] == 'n') return ""; /* null */
-                        auto e = sc.find_first_of(",}\n", p);
-                        return (e == std::string::npos) ? sc.substr(p) : sc.substr(p, e - p);
-                    };
+                    /* A record written before audio protocol version 4 is on
+                     * the old noise-density scale and reads about 34 dB high;
+                     * normalise it so one column is one scale.  See
+                     * navtex_snr.h. */
+                    snr_rescaled = sidecar_is_legacy_scale(sc);
+                    sc = sidecar_normalise_scale(sc);
 
-                    inline_snr      = extract_num("avg_snr_db");
-                    inline_duration = extract_num("duration_s");
+                    inline_snr      = sidecar_field(sc, "avg_snr_db");
+                    inline_duration = sidecar_field(sc, "duration_s");
                 }
             }
         }
@@ -2321,17 +2456,12 @@ static std::string history_list_json(const std::string &log_dir)
             if (has_metrics) {
                 /* Validate extracted values are real JSON numbers before embedding.
                  * Guards against "-nan", "inf", etc. in existing sidecar files. */
-                auto is_json_number = [](const std::string &s) -> bool {
-                    if (s.empty()) return false;
-                    for (char c : s)
-                        if (!isdigit((unsigned char)c) && c != '-' && c != '.'
-                                && c != 'e' && c != 'E' && c != '+')
-                            return false;
-                    return true;
-                };
-                if (is_json_number(inline_snr))
+                if (sidecar_is_number(inline_snr)) {
                     json += ",\"snr\":" + inline_snr;
-                if (is_json_number(inline_duration))
+                    if (snr_rescaled)
+                        json += ",\"snr_rescaled\":true";
+                }
+                if (sidecar_is_number(inline_duration))
                     json += ",\"duration_s\":" + inline_duration;
             }
         }
@@ -2843,7 +2973,8 @@ int main(int argc, const char **argv)
                     if (kpos != std::string::npos)
                         rel = url_decode(qs.substr(kpos + key.size()));
                 }
-                std::string content = history_read_metrics(log_dir, rel);
+                std::string content =
+                    sidecar_normalise_scale(history_read_metrics(log_dir, rel));
                 if (content.empty()) {
                     resp->statusCode  = 404;
                     resp->description = "Not Found";

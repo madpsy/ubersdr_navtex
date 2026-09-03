@@ -234,6 +234,160 @@ static void test_json_find_bool()
           "non-boolean falls back to the default");
 }
 
+
+/* ------------------------------------------------------------------ */
+/* Audio protocol version 4 SNR scale                                   */
+/* ------------------------------------------------------------------ */
+
+/*
+ * Version 4 changed the noise figure from a density in dBFS/Hz to a power in
+ * dBFS, which drops every SNR by 10*log10(passband) -- 34.2 dB on the 2650 Hz
+ * filter this program asks for.  The thresholds moved with it.  Nothing about
+ * that failure is loud: a mis-scaled threshold just paints every message red.
+ *
+ * The numbers checked here are the ones measured live on 490 and 518 kHz; see
+ * navtex_snr.h for the captures they came from.
+ */
+static void test_snr_scale()
+{
+    printf("SNR scale (audio protocol version 4)\n");
+
+    /* A real 518 kHz transmission measured a median of 15.85 dB with a 5th
+     * percentile of 12.03.  A strong signal must read good. */
+    check(navtex_snr_class(15.85) == "good", "a measured 518 kHz signal is good");
+    check(navtex_snr_class(18.62) == "good", "its 95th percentile is good");
+    check(navtex_snr_class(25.12) == "good", "its peak is good");
+
+    /* The 490 kHz idle capture: median -6.59, max +2.32.  None of it may
+     * read as a signal. */
+    check(navtex_snr_class(-6.59) == "bad", "the measured idle floor is bad");
+    check(navtex_snr_class(-9.76) == "bad", "its 5th percentile is bad");
+    check(navtex_snr_class(2.32)  == "bad", "even its peak excursion is bad");
+
+    /* The empty band between the two distributions is where "warn" belongs. */
+    check(navtex_snr_class(6.0) == "warn", "the gap between them is warn");
+
+    check(navtex_snr_class(std::nan("")) == "dim", "no reading is dim");
+
+    /* The bar must not be pinned at either end for real traffic. */
+    check(navtex_snr_bar_pct(15.85) > 60.0 && navtex_snr_bar_pct(15.85) < 90.0,
+          "the bar is most of the way up for a real signal");
+    check(navtex_snr_bar_pct(-6.59) > 0.0 && navtex_snr_bar_pct(-6.59) < 25.0,
+          "the bar is low but not empty when idle");
+    check(navtex_snr_bar_pct(-40.0) == 0.0,   "the bar clamps at the bottom");
+    check(navtex_snr_bar_pct(999.0) == 100.0, "the bar clamps at the top");
+
+    /* The shift itself, against the paired live measurement of 34.22 dB. */
+    const double shift = navtex_snr_scale_shift_db();
+    check(shift > 34.1 && shift < 34.4, "the scale shift matches the measured 34.22 dB");
+}
+
+/* ------------------------------------------------------------------ */
+/* Stored records written on either scale                               */
+/* ------------------------------------------------------------------ */
+
+/*
+ * The log directory outlives the migration, so one field holds records from
+ * both scales.  A pre-migration record read back unconverted would be about
+ * 34 dB high -- it would show every old message as the best signal ever
+ * received, right next to new ones showing as the worst.
+ */
+static void test_sidecar_scale()
+{
+    printf("stored metrics scale\n");
+
+    /* What save_message() writes today. */
+    const std::string modern =
+        "{\n  \"audio_protocol_version\": 4,\n  \"noise_scale\": \"passband_power\",\n"
+        "  \"avg_snr_db\": 15.85,\n  \"avg_noise_density_dbfs\": -112.70,\n"
+        "  \"duration_s\": 132\n}\n";
+
+    /* What a pre-migration build wrote: the same physical signal, 34.2 dB
+     * higher, with no stamp to say so. */
+    const std::string legacy =
+        "{\n  \"freq_hz\": 518000,\n"
+        "  \"avg_snr_db\": 50.07,\n  \"avg_noise_density_dbfs\": -146.92,\n"
+        "  \"duration_s\": 132\n}\n";
+
+    check(!sidecar_is_legacy_scale(modern), "a stamped record is not legacy");
+    check(sidecar_is_legacy_scale(legacy),  "an unstamped record is legacy");
+
+    /* A modern record passes through untouched -- no double conversion. */
+    check(sidecar_normalise_scale(modern) == modern,
+          "a version 4 record is returned unchanged");
+
+    const std::string fixed = sidecar_normalise_scale(legacy);
+    const double snr = atof(sidecar_field(fixed, "avg_snr_db").c_str());
+    const double noise = atof(sidecar_field(fixed, "avg_noise_density_dbfs").c_str());
+
+    /* 50.07 - 34.23 = 15.84: the same transmission the modern record holds. */
+    check(snr > 15.7 && snr < 16.0,
+          "a pre-migration SNR converts onto the version 4 scale");
+    check(navtex_snr_class(snr) == "good",
+          "and then classifies the same as the equivalent new record");
+    check(navtex_snr_class(atof(sidecar_field(legacy, "avg_snr_db").c_str())) == "good"
+              && atof(sidecar_field(legacy, "avg_snr_db").c_str()) > 45.0,
+          "unconverted, it would have read 50 dB -- off the new scale entirely");
+
+    /* -146.92 + 34.23 = -112.69: a power, matching the modern record. */
+    check(noise > -112.9 && noise < -112.5,
+          "the noise density converts to a passband power");
+
+    check(contains(fixed, "\"snr_rescaled_from_density\": true"),
+          "the conversion is declared in what comes back");
+    check(contains(fixed, "\"audio_protocol_version\": 2"),
+          "and the record still reports the version it was recorded on");
+
+    /* A record whose metrics were never populated must survive the trip. */
+    const std::string nulls =
+        "{\n  \"avg_snr_db\": null,\n  \"avg_noise_density_dbfs\": null\n}\n";
+    const std::string nfixed = sidecar_normalise_scale(nulls);
+    check(contains(nfixed, "\"avg_snr_db\": null"),
+          "a null SNR is left null rather than becoming a number");
+
+    /* Older sidecars can hold "-nan"; converting one would make it look real. */
+    const std::string nan_rec =
+        "{\n  \"avg_snr_db\": -nan,\n  \"avg_noise_density_dbfs\": -nan\n}\n";
+    check(contains(sidecar_normalise_scale(nan_rec), "-nan"),
+          "a non-numeric value is left alone");
+}
+
+/*
+ * The page carries the thresholds as generated JavaScript.  A literal left
+ * behind in navtex_html.h would compile, render and simply be wrong, so check
+ * the constants reach the page and that none of the old ones survive.
+ */
+static void test_page_snr_constants()
+{
+    printf("generated page constants\n");
+
+    std::vector<ChannelContext> chans(1);
+    chans[0].channel_id = 0;
+    chans[0].label      = "518 kHz";
+    const std::string page = make_html_page("http://sdr.example", chans, "", true);
+
+    check(contains(page, "const SNR_GOOD_DB     = 12.00;"),
+          "the good boundary reaches the page");
+    check(contains(page, "const SNR_WARN_DB     = 3.00;"),
+          "the warn boundary reaches the page");
+    check(contains(page, "const SNR_BAR_MIN_DB  = -10.00;"),
+          "the bar floor reaches the page");
+    check(contains(page, "const SNR_BAR_SPAN_DB = 35.00;"),
+          "the bar span reaches the page");
+
+    check(!contains(page, "> 45 ?"), "no version 2 'good' threshold is left in the page");
+    check(!contains(page, "> 35 ?"), "no version 2 'warn' threshold is left in the page");
+    check(!contains(page, "- 25) / 35"), "no version 2 bar range is left in the page");
+    check(!contains(page, "dBFS/Hz"),
+          "the noise label no longer claims a density");
+
+    /* Every call site must resolve to the shared helpers. */
+    check(contains(page, "function snrCls("),      "snrCls is defined once, at page scope");
+    check(contains(page, "function snrBarPct("),   "snrBarPct is defined");
+    check(contains(page, "snrCls(m.snr)"),         "the history table uses it");
+    check(contains(page, "snrClass(m.avg_snr_db)"),"the metrics modal uses it");
+}
+
 int main()
 {
     printf("navtex MQTT self-test\n\n");
@@ -243,6 +397,9 @@ int main()
     test_message_json_escapes_hostile_text();
     test_subject_names();
     test_json_find_bool();
+    test_snr_scale();
+    test_sidecar_scale();
+    test_page_snr_constants();
 
     printf("\n%s\n", g_failures == 0 ? "all checks passed"
                                      : "FAILURES PRESENT");
