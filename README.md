@@ -271,7 +271,10 @@ difference between the two returns plausible-sounding noise rather than an
 error. `test/testdata/pcmv4_stream.bin` covers mono audio, silent packets
 carrying no body, an escape to verbatim samples and a sample-rate change;
 `pcmv4_rice_edge.bin` covers a Rice codeword whose unary run is exactly 63 bits,
-where a 64-bit shift is zero in Go and undefined in C++.
+where a 64-bit shift is zero in Go and undefined in C++; `pcmv4_scaled.bin`
+covers the reduced-depth IQ profile, where a shift byte leads the body. NAVTEX
+never meets that last one — it takes demodulated mono audio, and the server
+offers the profile only on IQ — but the decoder implements it, so it is checked.
 
 ---
 
