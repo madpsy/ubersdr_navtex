@@ -9,3 +9,6 @@ IXWebSocket/
 .vscode/
 *.swp
 *~
+
+# Python bytecode (tools/, test/ident/)
+__pycache__/

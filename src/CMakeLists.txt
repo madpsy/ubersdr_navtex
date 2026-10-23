@@ -7,10 +7,12 @@ target_link_libraries(navtex_rx_from_file libnavtex)
 # navtex_rx_from_ubersdr: receive audio from a ka9q_ubersdr server
 # Requires: libcurl, IXWebSocket (+ OpenSSL for wss://).
 # The audio protocol version 4 decoder (pcm_v4.hpp) is header-only and needs
-# no library, so there is no compression dependency here.
+# no library.  zlib is for gzipping the large JSON responses (/api/history,
+# /api/analytics); libcurl depends on it already, so it is always present.
 # -----------------------------------------------------------------------
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(CURL   REQUIRED libcurl)
+find_package(ZLIB REQUIRED)
 
 # IXWebSocket: prefer a system install, fall back to the copy bundled with
 # the ubersdr client tree (../ka9q_ubersdr/clients/CW_Skimmer/UberSDRIntf).
@@ -74,6 +76,7 @@ target_link_libraries(navtex_rx_from_ubersdr
     libnavtex
     ${IXWS_LIBS}
     ${CURL_LIBRARIES}
+    ZLIB::ZLIB
     m
 )
 
@@ -96,6 +99,7 @@ target_link_libraries(mqtt_selftest
     libnavtex
     ${IXWS_LIBS}
     ${CURL_LIBRARIES}
+    ZLIB::ZLIB
     m
 )
 

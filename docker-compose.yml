@@ -16,6 +16,16 @@ services:
       NAVTEX_LOG_RETAIN_DAYS: "30"
       # Uncomment and set as needed:
       # WEB_PORT: "6092"
+      # Receiver position for station identification, in decimal degrees.
+      # Only needed if UberSDR has no GPS position set; both are required.
+      # NOTE: this position is shown publicly by the web UI / API and MQTT —
+      # round it (2 decimals is ~1 km) if you do not want to publish it exactly.
+      # NAVTEX_RX_LAT: "56.0403"
+      # NAVTEX_RX_LON: "-3.3554"
+      # Map tiles for the web UI (default: OpenStreetMap, darkened in the page).
+      # Point these at your own tile server, e.g. on an offline LAN:
+      # NAVTEX_MAP_TILES: "https://tiles.example.lan/{z}/{x}/{y}.png"
+      # NAVTEX_MAP_ATTRIBUTION: "&copy; OpenStreetMap contributors"
       # UI_PASSWORD: ""   # Set a password to enable write actions in the web UI.
                           # Leave empty (default) to disable all write actions.
     volumes:

@@ -45,6 +45,9 @@ All configuration is via environment variables in `docker-compose.yml`:
 | `NAVTEX_FREQ_2` | `490000` | Second NAVTEX carrier frequency in Hz (National/coastal) |
 | `WEB_PORT` | `6092` | Web UI port |
 | `NAVTEX_LOG_DIR` | `/data/navtex_logs` | Directory inside the container to save decoded messages. Set to `""` to disable. |
+| `NAVTEX_RX_LAT` / `NAVTEX_RX_LON` | *(unset)* | Receiver position in decimal degrees, for station identification. Only needed if UberSDR has no GPS position set; overrides it when both are given. **The position is published** — see [Receiver location](#station-identification). |
+| `NAVTEX_MAP_TILES` | *(OpenStreetMap)* | Leaflet tile URL template for the web UI's maps, e.g. `https://tiles.example.lan/{z}/{x}/{y}.png`. Default `https://tile.openstreetmap.org/{z}/{x}/{y}.png`. |
+| `NAVTEX_MAP_ATTRIBUTION` | *(OpenStreetMap credit)* | HTML credit line shown on the maps for those tiles. Set it whenever you set `NAVTEX_MAP_TILES`. |
 
 Both frequencies are **always monitored simultaneously** — there is no single-frequency mode.
 
@@ -180,14 +183,28 @@ A NAVTEX body is capped at 8 KiB by the parser and the ingest payload limit is
   "chars_fec_pct": 2.0,
   "chars_failed_pct": 0.5,
   "text": "ZCZC EA02\nGALE WARNING\n…\nNNNN\n",
-  "body": "GALE WARNING\n…"
+  "body": "GALE WARNING\n…",
+  "station_name": "Niton",
+  "station_country": "United Kingdom",
+  "station_iso2": "gb",
+  "station_confidence": 0.973,
+  "station_level": "high",
+  "station_distance_km": 622.4,
+  "ident": { "key": "518:E:Niton", "conf": 0.973, "facts": ["…"], "…": "…" }
 }
 ```
+
+`station` stays the header letter. `station_*` name the identified transmitter
+(`station_confidence` is 0–1, like `ident.conf`); they are `null` when the
+message could not be attributed. Because the message is published once it has
+been identified, a message that completes during the startup replay is published
+when the replay finishes.
 
 The retained summary carries `messages_total`, `messages_last_hour`,
 `messages_by_frequency`, `channels_connected`, `dropped_events`, and the last
 message broken out field by field (`last_message_id`, `last_station`,
-`last_subject_name`, `last_frequency_khz`, `last_snr_db`, …).
+`last_subject_name`, `last_frequency_khz`, `last_snr_db`, `last_station_name`,
+`last_station_country`, `last_station_confidence`, `last_station_distance_km`, …).
 
 Message text is sanitised to printable ASCII before publishing. This matters:
 `CCIR476::code_to_char` returns a *negated* code for unassigned bit patterns and
@@ -208,14 +225,18 @@ receiver, with a link straight through to this web UI:
 | Messages (Last Hour) | sensor | Rolling 60-minute count |
 | Last Message | sensor | State is the message id (e.g. `EA02`); text and metadata as attributes |
 | Last Subject | sensor | Subject letter decoded, e.g. `Navigational warning` |
-| Last Station | sensor | Station identifier letter |
+| Last Station | sensor | Station identifier letter (unchanged) |
+| Last Station Name | sensor | Identified transmitter, e.g. `Niton` |
+| Last Station Country | sensor | e.g. `United Kingdom` |
+| Last Station Confidence | sensor | % |
+| Last Station Distance | sensor | km from the receiver |
 | Last Message Time | sensor | Timestamp |
 | Last Frequency | sensor | kHz |
 | Last Message SNR | sensor | dB |
 | Last Message Quality | sensor | Clean-character %, diagnostic |
 | Receiver Link | binary sensor | Audio stream connected, diagnostic |
 
-All ten read from the single retained `summary` topic, so Home Assistant has
+All fourteen read from the single retained `summary` topic, so Home Assistant has
 values the moment it subscribes rather than waiting for the next transmission.
 
 The message text is trimmed to 1 KiB in the *Last Message* attributes, because
@@ -248,6 +269,20 @@ signal classifies as good, that the idle floor classifies as bad, that the
 thresholds reach the generated page, and that a message recorded before the
 audio protocol version 4 migration is converted onto the current scale rather
 than read 34 dB high.
+
+Station identification facts (`src/navtex_ident_facts.h`) — header-only, needs
+nothing but a compiler:
+
+```bash
+cmake --build build --target ident_facts_test
+ctest --test-dir build -R ident_facts --output-on-failure
+```
+
+`mqtt_selftest` also covers the identification plumbing: the ident JSON and its
+MQTT fields, parsing `/api/description`, the sidecar rewrite (atomic, replaces
+rather than duplicates, leaves the rest of the file untouched) and the worker end
+to end on a scratch log directory — replay, a live completion, a provisional
+answer and the pending state in `/api/history`.
 
 Audio protocol version 4 conformance — decodes packet streams the **server's**
 encoder produced and compares the SHA-256 of the decoded samples:
@@ -296,6 +331,123 @@ converted when the history API reads them, are marked as converted in what it
 returns, and the history table says so on hover — so old and new messages are
 comparable in one column. Sidecars written from now on carry an
 `audio_protocol_version` stamp so no future migration has to infer their scale.
+
+## Station identification
+
+A NAVTEX header names its transmitter with one letter, and the letters are
+re-used around the world: on 518 kHz `E` is Niton in the English Channel, but
+also Samsun, Charleston and four more. Every message is therefore identified —
+which transmitter, how sure, and why — from the station table
+(`src/navtex_stations.h`, from Wikipedia's *List of Navtex stations*), the
+receiver's position, the transmission schedule and what has been heard before.
+
+**Receiver location.** Read from UberSDR's `/api/description`
+(`receiver.gps.lat` / `lon`). Set the GPS position in UberSDR, or override it:
+
+```yaml
+environment:
+  NAVTEX_RX_LAT: "56.0403"
+  NAVTEX_RX_LON: "-3.3554"
+```
+
+Both are required; a half-set or invalid override is logged and ignored. If
+UberSDR cannot be reached at startup the decoder retries after 2, 4, 8 and 16 s
+(the history replay waits for this, about half a minute at most), then every
+60 s; it refreshes the position every 6 hours.
+
+> **Privacy.** Whatever position the decoder uses is public to anyone who can
+> reach the web UI: `/api/stations` and `/api/analytics` show it (to 4
+> decimals, about 11 m), every identification carries it (`"rx"` in
+> `/api/ident`, `/api/latest`, the WebSocket and the sidecars), it goes out over
+> MQTT, and the API answers cross-origin (`Access-Control-Allow-Origin: *`).
+> Even without those fields it could be worked out from the per-message
+> distances to known transmitters. If you set `NAVTEX_RX_LAT` / `NAVTEX_RX_LON`
+> because you did not want to publish a GPS position in UberSDR, give a rounded
+> one instead (two decimals is about 1 km — plenty for identification, which
+> works at the scale of hundreds of km). A position that changes by more than 5 km re-identifies
+the whole history, because it changes every answer. Without a position,
+identification still runs but confidence is limited, and the web UI says so.
+
+**At startup** the decoder replays the whole log history through the identifier
+in chronological order (it learns from what it has heard) and writes each answer
+into the message's `.json` sidecar as an `"ident"` member. A sidecar already
+identified by the same algorithm version, station table and receiver position is
+not rewritten. Live messages that complete during the replay are identified
+after it. On 32,651 real messages, reading the history takes about a second and
+rewriting every sidecar (the first start, or after the receiver moves) about six
+more, on top of the identification itself.
+
+**Every identification carries facts** — three to six plain sentences such as
+*"7 stations use letter E on 518 kHz"*, *"Nearest is Niton, 622 km at 166°"*,
+*"Started 1 min 42 s into E's 00:40 slot"* — produced in one place
+(`src/navtex_ident_facts.h`) and shown verbatim by the web UI, the API and MQTT.
+
+### API
+
+| Endpoint | Returns |
+|----------|---------|
+| `GET /api/history` | As before, plus `st` per message: `{key, name, iso2, country_name, navarea, conf, level, dist_km, bearing, night}`; `st: null, st_pending: true` until identified; `{"level":"none","key":null}` when unattributed |
+| `GET /api/ident?rel=<path>` | The full identification of one message (station, confidence, distance, members, alternatives, facts) |
+| `GET /api/latest` | As before, each entry with an `ident` object |
+| `GET /api/stations` | Receiver location, replay progress, and every table station with distance, schedule and `heard` statistics |
+| `GET /flags/<iso2>.svg` | Country flag, embedded in the binary (works offline) |
+| `GET /api/analytics[?from=&to=]` | Every identified message as compact columnar JSON (time, frequency, station, confidence, distance, bearing, path, SNR, duration, failed characters) for the Metrics view; `from`/`to` are optional unix seconds |
+
+`/api/history` is served from an in-memory index rather than by re-reading every
+sidecar, and the response is reused until something changes (or for at most
+30 s): a few milliseconds instead of about a second for a few months of logs.
+
+A station `key` is `freq_khz:letter:name` (e.g. `518:E:Niton`) — stable across
+regenerations of the station table, unlike its index.
+
+The browser WebSocket gains frame `0x05`: `[0x05][channel][JSON ident]`, sent
+provisionally (`"provisional": true`) as soon as the header is decoded and
+finally when the message completes.
+
+**Maps.** The Stations tab, the Metrics view's Coverage tab and each message's
+Identification panel draw maps with Leaflet (from cdnjs) over OpenStreetMap
+tiles, darkened in the page. Set `NAVTEX_MAP_TILES` and `NAVTEX_MAP_ATTRIBUTION`
+to use your own tile server instead. Without internet access the maps hide
+themselves and the tables, charts and identification details still work.
+
+### How it decides, and how far to trust it
+
+Two independently built methods run side by side — a probabilistic model of
+propagation, schedule and SNR, and a set of transparent rules — and their
+answers are combined (`src/navtex_ident.h` explains both and the combiner). A
+**high** answer needs both to agree, the message's transmission run to fit the
+station's schedule, the station to be within reach, and a receiver position
+that has been checked against what is heard; a disagreement is never high.
+
+Measured with the harness in `test/ident/` (see its README): on 32,651 real
+messages from one receiver, labelled independently from their text, no high
+answer was wrong (0 of 8,263). On synthetic worlds generated to be unlike the
+tuning data, 0.2–0.6 % of high answers were wrong — and up to about 1.5 % in a
+world that happens to put an unlisted transmitter beside a busy listed one,
+which is the remaining known weakness: a transmitter that is **missing from the station table** but near the
+receiver, using a letter a listed station also uses, can be confidently named as
+that listed station. "High" therefore assumes the table is complete near you —
+reports of missing or wrong stations are very welcome.
+
+A new install shows no "high" answers until about 100 messages have been heard
+at the configured position (the position check); the startup replay of stored
+history covers this on every later start.
+
+### Data sources
+
+- **Station table** — `src/navtex_stations.h` is generated by
+  `tools/gen_navtex_stations.py` from a snapshot of Wikipedia's
+  [List of Navtex stations](https://en.wikipedia.org/wiki/List_of_Navtex_stations)
+  (`tools/navtex_stations.wiki`, CC BY-SA 4.0), plus `CORRECTIONS`, `REMOVALS`
+  and `ADDITIONS` in the generator. Each correction says what was wrong and the
+  evidence for it — receiver logs read for their text, published station
+  notices, and the RXX signal database; only individual facts are used, never
+  bulk data. Regenerate with
+  `python3 -I tools/gen_navtex_stations.py tools/navtex_stations.wiki > src/navtex_stations.h`.
+- **Flags** — SVGs from [flag-icons](https://github.com/lipis/flag-icons) 7.2.3
+  (MIT, `tools/flags/LICENSE`), embedded by `tools/gen_navtex_countries.py`
+  into `src/navtex_countries.h` and served from the binary. Flags are images
+  rather than emoji because Windows has no flag emoji.
 
 ## Ports
 

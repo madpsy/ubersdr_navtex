@@ -12,6 +12,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         git \
         libcurl4-openssl-dev \
         libssl-dev \
+        zlib1g-dev \
         pkg-config \
     && rm -rf /var/lib/apt/lists/*
 
@@ -40,6 +41,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
         libcurl4 \
         libssl3 \
+        zlib1g \
         ca-certificates \
     && rm -rf /var/lib/apt/lists/* \
     && useradd -r -u 1999 -s /bin/false navtex

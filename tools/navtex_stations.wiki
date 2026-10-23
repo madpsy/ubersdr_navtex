@@ -1,0 +1,2145 @@
+{{Short description|none}} <!-- This short description is INTENTIONALLY "none" - please see WP:SDNONE before you consider changing it! -->
+{{more citations needed|date=June 2020}}
+{{Use dmy dates|date=June 2020}}
+[[NAVTEX]] (navigation telex) is an international service that provides navigational and meteorological warnings and forecasts. This list identifies some Navtex stations.
+
+==Stations==
+[[File:NavareasUSCGMap.png|thumb|Map of the 21 NAVAREAS into which all the world's oceans are divided. Each serves to allocate responsibility for sending Marine and Safety Information (navigational warnings) to ships at sea, as part of the [[Global Maritime Distress and Safety System]] (GMDSS).]]
+A list of Navtex stations. Please improve this list by determining the exact location of the transmission antenna!
+
+Station broadcast ranges are in [[nautical mile]]s.
+
+== Navarea 1 – North Atlantic, North Sea, Baltic Sea ==
+
+518&nbsp;kHz (international)
+
+{| class="wikitable sortable"
+|- class="hintergrundfarbe5"
+! ID || Station || Operator || Position || class="unsortable" | State || Transmission Times (UTC) || Range || Active
+|-
+
+| A
+| [[Svalbard Radio|Svalbard]]
+| NOR
+| {{coord|78|03|25|N|13|36|35|E|type:landmark_scale:20000000|name=Svalbard Navtex}}
+| NO
+| 00:00, 04:00, 08:00, 12:00, 16:00, 20:00
+| 450
+| yes
+|-
+
+| B
+| [[Bodø Radio|Bodø]]
+| NOR
+| {{coord|67|16|00|N|14|23|00|E|type:landmark_scale:20000000|name=Bodø Navtex}}
+| NO
+| 00:10, 04:10, 08:10, 12:10, 16:10, 20:10
+| 450
+| yes
+|-
+
+| C
+| [[Vardø Radio|Vardø]]
+| NOR
+| {{coord|70|22|15.2|N|31|05|50.6|E|type:landmark_scale:20000000|name=Vardø Navtex}}
+| NO
+| 00:20, 04:20, 08:20, 12:20, 16:20, 20:20
+| 450
+| yes
+|-
+
+| D
+| Tórshavn
+| FRO
+| {{coord|62|00|53.8|N|06|48|00.2|W|type:landmark_scale:20000000|name=Tórshavn Navtex}}
+| FR
+| 00:30, 04:30, 08:30, 12:30, 16:30, 20:30
+| 250
+| yes
+|-
+
+| E
+| Niton
+| GBR
+| {{coord|50|35|10.67|N|01|15|17.12|W|type:landmark_scale:20000000|name=Niton Navtex}}
+| GB-IOW
+| 00:40, 04:40, 08:40, 12:40, 16:40, 20:40
+| 270
+| yes
+|-
+
+| G
+| Cullercoats
+| GBR
+| {{coord|55|04|23.52|N|01|27|47.64|W|type:landmark_scale:20000000|name=Cullercoats Navtex}}
+| GB-NTY
+| 01:00, 05:00, 09:00, 13:00, 17:00, 21:00
+| 270
+| yes
+|-
+
+| H
+| Bjuröklubb
+| SWE
+| {{coord|64|27|41.9|N|21|35|30.6|E|type:landmark_scale:20000000|name=Bjuröklubb Navtex}}
+| SE
+| 01:10, 05:10, 09:10, 13:10, 17:10, 21:10
+| 300
+| yes
+|-
+
+| I
+| [[Varberg Radio Station|Grimeton]]
+| SWE
+| {{coord|57|06|11|N|12|23|08|E|type:landmark_scale:20000000|name=Grimeton Navtex}}
+| SE
+| 01:20, 05:20, 09:20, 13:20, 17:20, 21:20
+| 300
+| yes
+|-
+
+| J
+| Gislövshammar
+| SWE
+| {{coord|55|29|20.1|N|14|18|51.2|E|type:landmark_scale:20000000|name=Gislövshammar Navtex}}
+| SE
+| 01:30, 05:30, 09:30, 13:30, 17:30, 21:30
+| 300
+| yes
+|-
+
+| K
+| Niton
+| GBR
+| {{coord|50|35|10.67|N|01|15|17.12|W|type:landmark_scale:20000000|name=Niton Navtex}}
+| FR
+| 01:40, 05:40, 09:40, 13:40, 17:40, 21:40
+| 270
+| yes
+|-
+
+| L
+| [[Rogaland Radio|Rogaland]]
+| NOR
+| {{coord|58|39|31.74|N|05|36|13.6|E|type:landmark_scale:20000000|name=Rogaland Navtex}}
+| NO
+| 01:50, 05:50, 09:50, 13:50, 17:50, 21:50
+| 450
+| yes
+|-
+
+| M
+| [[Jeløy Radio|Jeløy]]
+| NOR
+| {{coord|59|26|09|N|10|35|22|E|type:landmark_scale:20000000|name=Jeløy Navtex}}
+| NO
+| 02:00, 06:00, 10:00, 14:00, 18:00, 22:00
+| 150
+| yes
+|-
+
+| N
+| [[Ørlandet Radio|Ørlandet]]
+| NOR
+| {{coord|63|39|40.3|N|09|32|43.8|E|type:landmark_scale:20000000|name=Ørlandet Navtex}}
+| NO
+| 02:10, 06:10, 10:10, 14:10, 18:10, 22:10
+| 450
+| yes
+|-
+
+| O
+| Portpatrick
+| GBR
+| {{coord|54|50|38.56|N|05|07|28.12|W|type:landmark_scale:20000000|name=Portpatrick Navtex}}
+| GB-DGY
+| 02:20, 06:20, 10:20, 14:20, 18:20, 22:20
+| 270
+| yes
+|-
+
+| P
+| Netherlands Coastguard
+| NLD
+| {{coord|52|55|09.04|N|04|44|36.69|E|type:landmark_scale:20000000|name=Netherlands Coastguard Navtex}}
+| NL
+| 02:30, 06:30, 10:30, 14:30, 18:30, 22:30
+| 110
+| yes
+|-
+
+| Q
+| Malin Head
+| IRL
+| {{coord|55|21|47.8|N|07|20|21.3|W|type:landmark_scale:20000000|name=Malin Head Navtex}}
+| IE
+| 02:40, 06:40, 10:40, 14:40, 18:40, 22:40
+| 400
+| yes
+|-
+
+| R
+| Saudanes
+| ISL
+| {{coord|66|11|10.5|N|18|57|6.72|W|type:landmark_scale:20000000|name=Saudanes Navtex}}
+| IS
+| 02:50, 06:50, 10:50, 14:50, 18:50, 22:50
+| 550
+| yes
+|-
+
+| S
+| Pinneberg
+| DEU
+| {{coord|53|40|24|N|09|48|31|E|type:landmark_scale:20000000|name=Pinneberg Navtex}}
+| DE
+| 03:00, 07:00, 11:00, 15:00, 19:00, 23:00
+| 300
+| yes
+|-
+
+| T
+| Oostende
+| BEL
+| {{coord|51|04|53.0|N|03|20|44.70|E|type:landmark_scale:20000000|name=Oostende Navtex}}
+| BE
+| 03:10, 07:10, 11:10, 15:10, 19:10, 23:10
+| 55
+| yes
+|-
+
+| F
+| Tallinn
+| EST
+| {{coord|59|27|51.84|N|24|21|26.26|E|type:landmark_scale:20000000|name=Tallinn Navtex}}
+| EE
+| 00:50, 04:50, 08:50, 12:50, 16:50, 20:50
+| 250
+| yes
+|-
+
+| V
+| Oostende
+| BEL
+| {{coord|51|10|56.2|N|02|48|23.54|E|type:landmark_scale:20000000|name=Oostende Navtex}}
+| BE
+| 03:30, 07:30, 11:30, 15:30, 19:30, 23:30
+| 55
+| yes
+|-
+
+| W
+| Valentia
+| IRL
+| {{coord|51|55|47.12|N|10|20|56.5|W|type:landmark_scale:20000000|name=Valentia Navtex}}
+| IE
+| 03:40, 07:40, 11:40, 15:40, 19:40, 23:40
+| 400
+| yes
+|-
+
+| X
+| Grindavik
+| ISL
+| {{coord|63|49|59.55|N|22|27|2.83|W|type:landmark_scale:20000000|name=Grindavik Navtex}}
+| IS
+| 03:50, 07:50, 11:50, 15:50, 19:50, 23:50
+| 550
+| yes
+|}
+
+490&nbsp;kHz (national)
+
+{| class="wikitable sortable"
+|- class="hintergrundfarbe5"
+! ID || Station || Operator || Position|| State || class="unsortable" | Transmission Times (UTC) || Range || Active
+|-
+
+| B
+| Oostende
+| BE
+| 
+| BE
+| 00:10, 04:10, 08:10, 12:10, 16:10, 20:10
+| 
+| yes
+|-
+
+| C
+| Portpatrick
+| GBR
+| {{coord|54|50|38.56|N|05|07|28.12|W|type:landmark_scale:20000000|name=Portpatrick Navtex}}
+| GB-DGY
+| 00:20, 04:20, 08:20, 12:20, 16:20, 20:20
+| 270
+| yes
+|-
+
+| E
+| Saudanes
+| ISL
+| {{coord|66|11|10.5|N|18|57|6.72|W|type:landmark_scale:20000000|name=Saudanes Navtex}}
+| IS
+| 00:40, 04:40, 08:40, 12:20, 16:40, 20:40
+| 550
+| yes
+|-
+
+| I
+| Niton
+| GBR
+| {{coord|50|35|10.67|N|01|15|17.12|W|type:landmark_scale:20000000|name=Niton Navtex}}
+| GB-IOW
+| 01:20, 05:20, 09:20, 13:20, 17:20, 21:20
+| 270
+| yes
+|-
+
+| K
+| Grindavik
+| ISL
+| {{coord|63|49|59.55|N|22|27|2.83|W|type:landmark_scale:20000000|name=Grindavik Navtex}}
+| IS
+| 01:40, 05:40, 09:40, 13:40, 17:40, 21:40
+| 550
+| yes
+|-
+
+| L
+| Pinneberg
+| DEU
+| {{coord|53|40|24|N|09|48|31|E|type:landmark_scale:20000000|name=Pinneberg Navtex}}
+| DE
+| 01:50, 05:50, 09:50, 13:50, 17:50, 21:50
+| 300
+| yes
+|-
+
+| U
+| Cullercoats
+| GBR
+| {{coord|55|04|23.52|N|01|27|47.64|E|type:landmark_scale:20000000|name=Cullercoats Navtex}}
+| GB-NTY
+| 03:20, 07:20, 11:20, 15:20, 19:20, 23:20
+| 270
+|  yes
+|}
+
+== Navarea 2 – East Atlantic==
+
+518&nbsp;kHz (international)
+
+{| class="wikitable sortable"
+|- class="hintergrundfarbe5"
+! ID || Station || Operator || Position|| class="unsortable" | Transmission times (UTC) || range || active?
+|-
+| A
+| [[Ouessant|Cross Corsen]]
+| FRA
+| {{coord|48|28|33.71|N|05|03|13.31|W|type:landmark_scale:20000000|name=Cross Corsen Navtex}}
+| 00:00, 04:00, 08:00, 12:00, 16:00, 20:00
+| 300
+| yes
+|-
+| D
+| [[A Coruña|Coruna]]
+| ESP
+| {{coord|43|22|1.3|N|08|27|6.7|W|type:landmark_scale:20000000|name=Coruna Navtex}}
+| 00:30, 04:30, 08:30, 12:30, 16:30, 20:30
+| 400
+| yes
+|-
+| F
+| [[Horta, Azores|Horta]]
+| POR
+| {{coord|38|31|47.54|N|28|37|44.12|W|type:landmark_scale:20000000|name=Horta Navtex}}
+| 00:50, 04:50, 08:50, 12:50, 16:50, 20:50
+| 640
+| yes
+|-
+| G
+| [[Tarifa]]
+| ESP
+| {{coord|36|02|31.2|N|05|33|23.78|W|type:landmark_scale:20000000|name=Tarifa Navtex}}
+| 01:00, 05:00, 09:00, 13:00, 17:00, 21:00
+| 400
+| yes
+|-
+| I
+| [[Las Palmas de Gran Canaria|Las Palmas]]
+| ESP
+| {{coord|27|45|30.68|N|15|36|19.3|W|type:landmark_scale:20000000|name=Las Palmas Navtex}}
+| 01:20, 05:20, 09:20, 13:20, 17:20, 21:20
+| 400
+| yes
+|-
+| M
+| [[Casablanca]]
+| MRC
+| {{coord|33|36||N|07|38||W|type:landmark_scale:20000000|name=Casablanca Navtex}}
+| 02:00, 06:00, 10:00, 14:00, 18:00, 22:00
+| 180
+| no
+|-
+| P
+| [[Porto Santo]]
+| POR
+| {{coord|33|03|58.6|N|16|21|19.5|W|type:landmark_scale:20000000|name=Porto Santo Navtex}}
+| 02:30, 06:30, 10:30, 14:30, 18:30, 22:30
+|
+| no
+|-
+| R
+| [[Monsanto Forest Park|Monsanto]]
+| POR
+| {{coord|38|43|53.8|N|09|11|26.2|W|type:landmark_scale:20000000|name=Monsanto Navtex}}
+| 02:50, 06:50, 10:50, 14:50, 18:50, 22:50
+| 530
+| yes
+|-
+| U
+| [[Ribeira de Vinha]]
+| CPV
+| {{coord|16|51|11.62|N|25|00|11.51|W|type:landmark_scale:20000000|name=Ribeira de Vinha Navtex}}
+| 03:20, 07:20, 11:20, 15:20, 19:20, 23:20
+| 250
+| yes
+|-
+| X
+| [[Valencia|Cabo La Nao]]
+| ESP
+| {{coord|38|43|23.73|N|0|09|40.92|E|type:landmark_scale:20000000|name=Cabo La Nao Navtex}}
+| 03:50, 07:50, 11:50, 15:50, 19:50, 23:50
+| 
+| yes
+|}
+
+490&nbsp;kHz (national)
+
+{| class="wikitable sortable"
+|- class="hintergrundfarbe5"
+! ID || Station || Operator || Position || class="unsortable" | Transmission times (UTC) || range || active?
+|-
+| A
+| [[Las Palmas de Gran Canaria|Las Palmas]]
+| ESP
+| {{coord|27|45|30.68|N|15|36|19.3|W|type:landmark_scale:20000000|name=Las Palmas Navtex}}
+| 00:00, 04:00, 08:00, 12:00, 16:00, 20:00
+|
+| yes
+|-
+| E
+| [[Ouessant|Cross Corsen]]
+| FRA
+| {{coord|48|24|50.6|N|04|47|17|W|type:landmark_scale:20000000|name=Cross Corsen Navtex}}
+| 00:40, 04:40, 08:40, 12:40, 16:40, 20:40
+| 300
+| yes
+|-
+| G
+| [[Monsanto]]
+| POR
+| {{coord|38|43|53.8|N|09|11|26.2|W|type:landmark_scale:20000000|name=Monsanto Navtex}}
+| 01:00, 05:00, 09:00, 13:00, 17:00, 21:00
+| 530
+| yes
+|-
+| J
+| [[Horta, Azores|Horta]]
+| POR
+| {{coord|38|31|47.54|N|28|37|44.12|W|type:landmark_scale:20000000|name=Horta Navtex}}
+| 01:30, 05:30, 09:30, 13:30, 17:30, 21:30
+| 640
+| no
+|-
+| M
+| [[Madeira|Porto Santo]]
+| POR
+| {{coord|33|03|58.6|N|16|21|19.5|W|type:landmark_scale:20000000|name=Porto Santo Navtex}}
+| 02:00, 06:00, 10:00, 14:00, 18:00, 22:00
+|
+| no
+|-
+| M
+| [[Valencia|Cabo La Nao]]
+| ESP
+| {{coord|38|43|23.73|N|0|09|40.92|E|type:landmark_scale:20000000|name=Cabo La Nao Navtex}}
+| 02:00, 06:00, 10:00, 14:00, 18:00, 22:00
+|
+| yes
+|-
+| P
+| [[São Vicente (Kap Verde)|São Vicente]]
+| CPV
+| {{coord|16|51|11.62|N|25|00|11.51|W|type:landmark_scale:20000000|name=Ribeira de Vinha Navtex}}
+| 02:30, 06:30, 10:30, 14:30, 18:30, 22:30
+| 250
+| yes
+|-
+| T
+| [[Isle of Wight|Niton]]
+| GBR
+| {{coord|50|34|54.61|N|01|17|41.94|W|type:landmark_scale:20000000|name=Niton Navtex}}
+| 03:10, 07:10, 11:10, 15:10, 19:10, 23:10
+| 270
+| yes
+|-
+| T
+| [[Tarifa]]
+| ESP
+| {{coord|36|02|31.2|N|05|33|23.78|W|type:landmark_scale:20000000|name=Tarifa Navtex}}
+| 03:10, 07:10, 11:10, 15:10, 19:10, 23:10
+|
+| yes
+|-
+| W
+| [[A Coruña|Coruna]]
+| ESP
+| {{coord|43|22|1.3|N|08|27|6.7|W|type:landmark_scale:20000000|name=Coruna Navtex}}
+| 03:40, 07:40, 11:40, 15:40, 19:40, 23:40
+|
+| yes
+|}
+<!-- ------------------------------------------------ -->
+
+== Navarea 3 – Mediterranean Sea ==
+
+518&nbsp;kHz (international)
+
+{| class="wikitable sortable"
+|- class="hintergrundfarbe5"
+! ID || Station || Operator || Position || class="unsortable" | Transmission times (UTC)|| Dist || Active
+|-
+|-
+| A
+| [[Novorossijsk]]
+| RUS
+| {{coord|44|35|56.8|N|37|57|5.19|E|type:landmark_scale:20000000|name=Novorossijsk Navtex}}
+| 03:00, 07:00, 11:00, 15:00, 19:00, 23:00
+| 300
+| yes
+|-
+| B
+| [[Algiers]]
+| ALG
+| {{coord|36|44|00|N|03|10|48|E|type:landmark_scale:20000000|name=Algier Navtex}}
+| 00:10, 02:10, ..., 22:10 (alle 2 Stunden)
+| 150
+| yes
+|-
+| B
+| [[Kerch]]
+| RUS
+| {{coord|45|20|50|N|36|32|40|E|type:landmark_scale:20000000|name=Kerch Navtex}}
+| 01:00, 05:00, 09:00, 13:00, 17:00, 21:00
+| 120
+| yes
+|-
+| C
+| [[Odesa]]
+| UKR
+| {{coord|46|22|39.4|N|30|44|53.6|E|type:landmark_scale:20000000|name=Odesa Navtex}}
+| 02:30, 06:30, 10:30, 14:30, 18:30, 22:30
+| 280
+| yes
+|-
+| D
+| [[Istanbul]]
+| TUR
+| {{coord|41|04||N|28|57||E|type:landmark_scale:20000000|name=Istanbul Navtex}}
+| 00:30, 04:30, 08:30, 12:30, 16:30, 20:30
+| 250-400
+| yes
+|-
+| E
+| [[Samsun]]
+| TUR
+| {{coord|41|23|12|N|36|11|18|E|type:landmark_scale:20000000|name=Samsun Navtex}}
+| 00:40, 04:40, 08:40, 12:40, 16:40, 20:40
+| 250-400
+| yes
+|-
+| F
+| [[Antalya]]
+| TUR
+| {{coord|36|09|09|N|32|26|24|E|type:landmark_scale:20000000|name=Antalya Navtex}}
+| 00:50, 04:50, 08:50, 12:50, 16:50, 20:50
+| 250-400
+| yes
+|-
+| H
+| [[Iraklio]]
+| GRC
+| {{coord|35|19|22.3|N|25|44|56.35|E|type:landmark_scale:20000000|name=Iraklio Navtex}}
+| 01:10, 05:10, 09:10, 13:10, 17:10, 21:10
+| 280
+| yes
+|-
+| I
+| [[İzmir]]
+| TUR
+| {{coord|38|16|33|N|26|16|03|E|type:landmark_scale:20000000|name=İzmir Navtex}}
+| 01:20, 05:20, 09:20, 13:20, 17:20, 21:20
+| 250-400
+| yes
+|-
+| J
+| [[Varna, Bulgaria|Varna]]
+| BUL
+| {{coord|43|04|05|N|27|47|10|E|type:landmark_scale:20000000|name=Varna Navtex}}
+| 01:30, 05:30, 09:30, 13:30, 17:30, 21:30
+| 350
+| yes
+|-
+| K
+| [[Corfu|Kerkyra]]
+| GRC
+| {{coord|39|36|26|N|19|53|27|E|type:landmark_scale:20000000|name=Kerkyra Navtex}}
+| 01:40, 05:40, 09:40, 13:40, 17:40, 21:40
+| 280
+| yes
+|-
+| L
+| [[Limnos]]
+| GRC
+| {{coord|39|54|23|N|25|10|53|E|type:landmark_scale:20000000|name=Limnos Navtex}}
+| 01:50, 05:50, 09:50, 13:50, 17:50, 21:50
+| 280
+| yes
+|-
+| M
+| [[Cyprus]]
+| CYP
+| {{coord|35|02|53.8|N|33|17|1.06|E|type:landmark_scale:20000000|name=Cyprus Navtex}}
+| 02:00, 06:00, 10:00, 14:00, 18:00, 22:00
+| 200
+| yes
+|-
+| N
+| [[Alexandria]]
+| EGY
+| {{coord|31|11|53.12|N|29|51|52.18|E|type:landmark_scale:20000000|name=Alexandria Navtex}}
+| 02:10, 06:10, 10:10, 14:10, 18:10, 22:10
+| 350
+| yes
+|-
+| O
+| [[Malta]]
+| MLT
+| {{coord|35|48|54.76|N|14|31|36.88|E|type:landmark_scale:20000000|name=Malta Navtex}}
+| 02:20, 06:20, 10:20, 14:20, 18:20, 22:20
+| 400
+| yes
+|-
+| P
+| [[Haifa]]
+| ISR
+| {{coord|32|49|40.1|N|34|58|9.5|E|type:landmark_scale:20000000|name=Haifa Navtex}}
+| 00:20, 04:20, 08:20, 12:20, 16:20, 20:20
+| 200
+| yes
+|-
+| Q
+| [[Split, Croatia|Split]]
+| HRV
+| {{coord|43|10|54.7|N|16|25|20.4|E|type:landmark_scale:20000000|name=Split Navtex}}
+| 02:40, 06:40, 10:40, 14:40, 18:40, 22:40
+| 85
+| yes
+|-
+| R
+| [[La Maddalena]]
+| ITA
+| {{coord|41|13|22|N|9|23|56|E|type:landmark_scale:20000000|name=La Maddalena Navtex}}
+| 02:50, 06:50, 10:50, 14:50, 18:50, 22:50
+| 320
+| yes
+|-
+| T
+| [[Kelibia]]
+| TUN
+| {{coord|36|48|6.55|N|11|02|14.54|E|type:landmark_scale:20000000|name=Kelibia Navtex}}
+| 03:10, 07:10, 11:10, 15:10, 19:10, 23:10
+| 320
+| no
+|-
+| U
+| [[Mondolfo]]
+| ITA
+| {{coord|43|44|52|N|13|08|30|E|type:landmark_scale:20000000|name=Mondolfo Navtex}}
+| 03:20, 07:20, 11:20, 15:20, 19:20, 23:20
+| 320
+| yes
+|-
+| V
+| Sellia Marina
+| ITA
+| {{coord|38|52|23|N|16|43|11|E|type:landmark_scale:20000000|name=Augusta Navtex}}
+| 03:30, 07:30, 11:30, 15:30, 19:30, 23:30
+| 320
+| yes
+|-
+| W
+| [[La Garde (Var)|Cross La Garde]]
+| FRA
+| {{coord|43|06|15.5|N|05|59|29|E|type:landmark_scale:20000000|name=Cross La Garde Navtex}}
+| 03:40, 07:40, 11:40, 15:40, 19:40, 23:40
+| 250
+| yes
+|-
+| X
+| [[Cabo de la Nao]]
+| ESP
+| {{coord|38|43|23.73|N|0|09|40.92|E|type:landmark_scale:20000000|name=Cabo de la Nao Navtex}}
+| 03:50, 07:50, 11:50, 15:50, 19:50, 23:50
+| 300
+| yes
+|}
+
+490&nbsp;kHz (national)
+
+{| class="wikitable sortable"
+|- class="hintergrundfarbe5"
+! ID|| Station || Operator || Position || class="unsortable" | Transmission times (UTC)|| Dist || Active
+|-
+| A
+| [[Samsun]]
+| TUR
+| {{coord|41|23|12|N|36|11|18|E|type:landmark_scale:20000000|name=Samsun Navtex}}
+| 00:00, 04:00, 08:00, 12:00, 16:00, 20:00
+| 250-400
+| yes
+|-
+| B
+| [[Istanbul]]
+| TUR
+| {{coord|41|04||N|28|57||E|type:landmark_scale:20000000|name=Istanbul Navtex}}
+| 00:10, 04:10, 08:10, 12:10, 16:10, 20:10
+| 250-400
+| yes
+|-
+| C
+| [[İzmir]]
+| TUR
+| {{coord|38|16|33|N|26|16|03|E|type:landmark_scale:20000000|name=İzmir Navtex}}
+| 00:20, 04:20, 08:20, 12:20, 16:20, 20:20
+| 250-400
+| yes
+|-
+| D
+| [[Antalya]]
+| TUR
+| {{coord|36|09|09|N|32|26|24|E|type:landmark_scale:20000000|name=Antalya Navtex}}
+| 00:30, 04:30, 08:30, 12:30, 16:30, 20:30
+| 250-400
+| yes
+|-
+| E
+| [[Mondolfo]]
+| ITA
+| {{coord|43|44|52|N|13|08|30|E|type:landmark_scale:20000000|name=Mondolfo Navtex}}
+| 
+|
+| yes
+|-
+| I
+| [[La Maddalena]]
+| ITA
+| {{coord|41|13|22|N|9|23|56|E|type:landmark_scale:20000000|name=La Maddalena Navtex}}
+|
+|  
+| yes
+|-
+| L
+| [[Constanța]]
+| ROU
+| {{coord|44|06|19|N|28|37|49.4|E|type:landmark_scale:20000000|name=Constanța Navtex}}
+| 01:50, 05:50, 09:50, 13:50, 17:50, 21:50
+| 400
+| no
+|-
+| M
+| [[Cabo de la Nao]]
+| ESP
+| {{coord|38|43|23.73|N|0|09|40.92|E|type:landmark_scale:20000000|name=Cabo de la Nao Navtex}}
+| 02:00, 06:00, 10:00, 14:00, 18:00, 22:00
+| 300
+| yes
+|-
+|N
+|Piombino
+|ITA
+|
+|02:10, 06:10, 10:10, 14:10, 18:10, 22:10
+|
+|yes
+|-
+| P
+| [[Corfu|Kerkyra]]
+| GRC
+| {{coord|39|36|26|N|19|53|27|E|type:landmark_scale:20000000|name=Kerkyra Navtex}}
+| 02:30, 06:30, 10:30, 14:30, 18:30, 22:30
+| 
+| yes
+|-
+| Q
+| [[Iraklio]]
+| GRC
+| {{coord|35|19|22.3|N|25|44|56.35|E|type:landmark_scale:20000000|name=Iraklio Navtex}}
+| 02:40, 06:40, 10:40, 14:40, 18:40, 22:40
+| 
+| yes
+|-
+| R
+| [[Limnos]]
+| GRC
+| {{coord|39|54|23|N|25|10|53|E|type:landmark_scale:20000000|name=Limnos Navtex}}
+| 02:50, 06:50, 10:50, 14:50, 18:50, 22:50
+| 
+| yes
+|-
+| S
+| [[La Garde (Var)|Cross La Garde]]
+| FRA
+| {{coord|43|06|15.5|N|05|59|29|E|type:landmark_scale:20000000|name=Cross La Garde Navtex}}
+| 03:00, 07:00, 11:00, 15:00, 19:00, 23:00
+| 250
+| yes
+|-
+| W
+| [[Sellia Marina]]
+| ITA
+| {{coord|38|52|23|N|16|43|11|E|type:landmark_scale:20000000|name=Augusta Navtex}}
+| 
+|
+| yes
+|}
+<!-- HERAKLION [Q]: 02:40 – 06:40 – 10:40* - 14:40 – 18:40* - 22:40, UTC
+KERKYRA [P]: 02:30 – 06:30 – 10:30* - 14:30 – 18:30* - 22:30, UTC
+LIMNOs [R]: 02:50 – 06:50 – 10:50* - 14:50 – 18:50* - 22:50, UTC -->
+
+== Navarea 4 – West Atlantic ==
+
+518&nbsp;kHz (international)
+
+{| class="wikitable sortable"
+|- class="hintergrundfarbe5"
+! Area || kHz || ID || Station || Operator || Position || class="unsortable" | Transmission times (UTC) || range || active?
+|-
+| 4 || 518
+| A
+| [[Miami]]
+| USA
+| {{coord|25|37|34.41|N|80|23|0.28|W|type:landmark_scale:20000000|format=dms|name=Miami Navtex}}
+| 00:00, 04:00, 08:00, 12:00, 16:00, 20:00
+| 240
+| yes
+|-
+| 4 || 518
+| B
+| [[St. George's Harbour, Bermuda|Bermuda Harbour]]
+| BER
+| {{coord|32|22|49.4|N|64|40|58|W|type:landmark_scale:20000000|name=Bermuda Harbour Navtex}}
+| 00:10, 04:10, 08:10, 12:10, 16:10, 20:10
+| 280
+| yes
+|-
+| 4 || 518
+| C
+| [[Sept-Îles, Quebec|Rivière-au-Renard]]
+| CAN
+| {{coord|50|11|42|N|66|06|35.6|W|type:landmark_scale:20000000|name=Rivière-au-Renard Navtex}}
+| 00:20, 04:20, 08:20, 12:20, 16:20, 20:20
+| 300
+| yes
+|-
+| 4 || 518
+| E
+| [[Charleston, South Carolina|Charleston]]
+| USA
+| {{coord|32|50.67|N|79|57.00|W|type:landmark_scale:20000000|name=Savannah Navtex}}
+| 00:40, 04:40, 08:40, 12:40, 16:40, 20:40
+| 200
+| no
+|-
+| 4 || 518
+| E
+| [[Savannah, Georgia|Savannah]]
+| USA
+| {{coord|32|08|22.65|N|81|41|48.56|W|type:landmark_scale:20000000|name=Savannah Navtex}}
+| 00:40, 04:40, 08:40, 12:40, 16:40, 20:40
+| 200
+| no
+|-
+| 4 || 518
+| F
+| [[Boston]]
+| USA
+| {{coord|41|42|35.4|N|70|29|54.07|W|type:landmark_scale:20000000|name=Boston Navtex}}
+| 00:50, 04:50, 08:50, 12:50, 16:50, 20:50
+| 200
+| yes
+|-
+| 4 || 518
+| G
+| [[New Orleans]]
+| USA
+| {{coord|29|53|4.65|N|89|56|44.2|W|type:landmark_scale:20000000|name=New Orleans Navtex}}
+| 01:00, 05:00, 09:00, 13:00, 17:00, 21:00
+| 200
+| yes
+|-
+| 4 || 518
+| H
+| [[Wiarton]]
+| CAN
+| {{coord|44|56|13.6|N|81|14|0.48|W|type:landmark_scale:20000000|name=Wiarton Navtex}}
+| 01:10, 05:10, 09:10, 13:10, 17:10, 21:10
+| 300
+| yes
+|-
+| 4 || 518
+| H
+| [[Curacao]]
+| NLD
+| {{coord|12|10|23.51|N|68|51|53.71|W|type:landmark_scale:20000000|name=Curacao Navtex}}
+| 01:10, 05:10, 09:10, 13:10, 17:10, 21:10
+| 400
+| yes
+|-
+| 4 || 518
+| N
+| [[Portsmouth, Virginia|Portsmouth]]
+| USA
+| {{coord|36|43|34.83|N|76|00|28.42|W|type:landmark_scale:20000000|name=Portsmouth Navtex}}
+| 02:10, 06:10, 10:10, 14:10, 18:10, 22:10
+| 280
+| yes
+|-
+| 4 || 518
+| O
+| [[St. John's, Newfoundland and Labrador|St. John's]]
+| CAN
+| {{coord|47|36|40|N|52|40|1|W|type:landmark_scale:20000000|name=St. John's Navtex}}
+| 02:20, 06:20, 10:20, 14:20, 18:20, 22:20
+| 300
+| yes
+|-
+| 4 || 518
+| P
+| [[Thunder Bay (Ontario)|Thunder Bay]]
+| CAN
+| {{coord|48|33|48.65|N|88|39|22.72|W|type:landmark_scale:20000000|name=Thunder Bay Navtex}}
+| 02:30, 06:30, 10:30, 14:30, 18:30, 22:30
+| 300
+| yes
+|-
+| 4 || 518
+| Q
+| [[Sydney, Nova Scotia|Sydney (Nova Scotia)]]
+| CAN
+| {{coord|46|11|8.00|N|59|53|37.00|W|type:landmark_scale:20000000|name=Sydney Navtex}}
+| 02:40, 06:40, 10:40, 14:40, 18:40, 22:40
+| 300
+| yes
+|-
+| 4 || 518
+| R
+| [[Isabela, Puerto Rico|Isabela (Puerto Rico)]]
+| USA
+| {{coord|18|28|0.06|N|67|04|18.55|W|type:landmark_scale:20000000|name=Isabela Navtex}}
+| 02:50, 06:50, 10:50, 14:50, 18:50, 22:50
+| 200
+| yes
+|-
+| 4 || 518
+| T
+| [[Iqaluit]]
+| CAN
+| {{coord|63|43|53|N|68|32|35.4|W|type:landmark_scale:20000000|name=Iqaluit Navtex}}
+| 03:10, 07:10, 11:10, 15:10, 19:10, 23:10
+| 300
+| yes
+|-
+| 4 || 518
+| U
+| [[Yarmouth, Nova Scotia|Saint John (Yarmouth)]]
+| CAN
+| {{coord|43|44|39.32|N|66|07|18.43|W|type:landmark_scale:20000000|name=Saint John Navtex}}
+| 03:20, 07:20, 11:20, 15:20, 19:20, 23:20
+| 300
+| yes
+|-
+| 4 || 518
+| W
+| [[Nuuk|Kook Island (Nuuk)]]
+| DNK
+| {{coord|64|04|01.26|N|52|00|45.4|W|type:landmark_scale:20000000|name=Kook Island Navtex}}
+| 03:40, 07:40, 11:40, 15:40, 19:40, 23:40
+| 400
+| yes
+|-
+| 4 || 518
+| X
+| [[Labrador]]
+| CAN
+| {{coord|53|42|31|N|57|01|18|W|type:landmark_scale:20000000|name=Labrador Navtex}}
+| 03:50, 07:50, 11:50, 15:50, 19:50, 23:50
+| 300
+| yes
+|}
+
+490&nbsp;kHz (national)
+
+{| class="wikitable sortable"
+|- class="hintergrundfarbe5"
+! Area || kHz || ID || Station || Operator || Position || class="unsortable" | Transmission times (UTC) || range || active?
+|-
+| 4 || 490
+| D
+| [[Sept-Îles, Quebec|Rivière-au-Renard]]
+| CAN
+| {{coord|50|11|42|N|66|06|35.6|W|type:landmark_scale:20000000|name=Sept-Îles Navtex}}
+| 00:35, 04:35, 08:35, 12:35, 16:35, 20:35
+| 300
+| yes
+|-
+| 4 || 490
+| J
+| [[Sydney, Nova Scotia|Sydney (Nova Scotia)]]
+| CAN
+| {{coord|46|11|8.00|N|59|53|37.00|W|type:landmark_scale:20000000|name=Sydney Navtex}}
+| 02:55, 06:55, 10:55, 14:55, 18:55, 22:55
+| 300
+| yes
+|-
+| 4 || 490
+| S
+| [[Iqaluit]]
+| CAN
+| {{coord|63|43|53|N|68|32|35.4|W|type:landmark_scale:20000000|name=Iqaluit Navtex}}
+| 03:00, 07:00, 11:00, 15:00, 19:00, 23:00
+| 300
+| yes
+|-
+| 4 || 490
+| V
+| [[Yarmouth (Nova Scotia)|Yarmouth]]
+| CAN
+| {{coord|43|44|39.32|N|66|07|18.43|W|type:landmark_scale:20000000|name=Yarmouth Navtex}}(needs region)
+| 03:35, 07:35, 11:35, 15:35, 19:35, 23:35
+| 300
+| yes
+|}
+
+== Navarea 5 – Brasil ==
+
+No NAVTEX stations available.  
+
+Brazil distributes its messages via Inmarsat-C. 
+== Navarea 6 – Argentina, Uruguay ==
+
+518&nbsp;kHz (international)
+
+{| class="wikitable sortable"
+|- class="hintergrundfarbe5"
+! Area || kHz || ID || Station || Operator || Position || class="unsortable" | Transmission times (UTC) || range || active?
+|-
+| 6 || 518
+| F
+| [[La Paloma, Uruguay|La Paloma]]
+| URG
+| {{coord|34|40||S|54|09||W|type:landmark_scale:20000000|name=La Paloma Navtex}}
+| 00:50, 04:50, 08:50, 12:50, 16:50, 20:50
+| 280
+| yes
+|-
+| 6 || 518
+| M
+| [[Ushuaia]]
+| ARG
+| {{coord|54|48||S|68|18||W|type:landmark_scale:20000000|name=Ushuaia Navtex}}
+| 02:00, 06:00, 10:00, 14:00, 18:00, 22:00
+| 280
+| no
+|-
+| 6 || 518
+| N
+| [[Rio Gallegos]]
+| ARG
+| {{coord|51|37||S|69|13||W|type:landmark_scale:20000000|name=Rio Gallegos Navtex}}
+| 02:10, 06:10, 10:10, 14:10, 18:10, 22:10
+| 280
+| yes
+|-
+| 6 || 518
+| O
+| [[Comodoro Rivadavia]]
+| ARG
+| {{coord|45|51||S|67|25||W|type:landmark_scale:20000000|name=Comodoro Rivadavia Navtex}}
+| 02:20, 06:20, 10:20, 14:20, 18:20, 22:20
+| 280
+| yes
+|-
+| 6 || 518
+| P
+| [[Bahía Blanca]]
+| ARG
+| {{coord|38|43||S|62|06||W|type:landmark_scale:20000000|name=Bahía Blanca Navtex}}
+| 02:30, 06:30, 10:30, 14:30, 18:30, 22:30
+| 280
+| yes
+|-
+| 6 || 518
+| Q
+| [[Mar del Plata]]
+| ARG
+| {{coord|38|03||S|57|32||W|type:landmark_scale:20000000|name=Mar del Plata Navtex}}
+| 02:40, 06:40, 10:40, 14:40, 18:40, 22:40
+| 280
+| yes
+|-
+| 6 || 518
+| R
+| [[Buenos Aires]]
+| ARG
+| {{coord|34|36||S|58|22||W|type:landmark_scale:20000000|name=Buenos Aires Navtex}}
+| 02:50, 06:50, 10:50, 14:50, 18:50, 22:50
+| 560
+| yes
+|}
+
+490&nbsp;kHz (national)
+
+{| class="wikitable sortable"
+|- class="hintergrundfarbe5"
+! Area || kHz || ID || Station || Operator || Position || class="unsortable" | Transmission times (UTC) || range || active?
+|-
+| 6 || 490
+| A
+| [[La Paloma, Uruguay|La Paloma]]
+| URG
+| {{coord|34|40||S|54|09||W|type:landmark_scale:20000000|name=La Paloma Navtex}}
+| 00:00, 04:00, 08:00, 12:00, 16:00, 20:00
+| 280
+| yes
+|-
+| 6 || 490
+| A
+| [[Ushuaia]]
+| ARG
+| {{coord|54|48||S|68|18||W|type:landmark_scale:20000000|name=Ushuaia Navtex}}
+| 00:00, 04:00, 08:00, 12:00, 16:00, 20:00
+| 280
+| yes
+|-
+| 6 || 490
+| B
+| [[Rio Gallegos]]
+| ARG
+| {{coord|51|37||S|69|13||W|type:landmark_scale:20000000|name=Rio Gallegos Navtex}}
+| 00:10, 04:10, 08:10, 12:10, 16:10, 20:10
+| 280
+| no
+|-
+| 6 || 490
+| C
+| [[Comodoro Rivadavia]]
+| ARG
+| {{coord|45|51||S|67|25||W|type:landmark_scale:20000000|name=Comodoro Rivadavia Navtex}}
+| 00:20, 04:20, 08:20, 12:20, 16:20, 20:20
+| 280
+| no
+|-
+| 6 || 490
+| D
+| [[Bahía Blanca]]
+| ARG
+| {{coord|38|43||S|62|06||W|type:landmark_scale:20000000|name=Bahía Blanca Navtex}}
+| 00:30, 04:30, 08:30, 12:30, 16:30, 20:30
+| 280
+| no
+|-
+| 6 || 490
+| E
+| [[Mar del Plata]]
+| ARG
+| {{coord|38|03||S|57|32||W|type:landmark_scale:20000000|name=Mar del Plata Navtex}}
+| 00:40, 04:40, 08:40, 12:40, 16:40, 20:40
+| 280
+| no
+|-
+| 6 || 490
+| F
+| [[Buenos Aires]]
+| ARG
+| {{coord|34|36||S|58|22||W|type:landmark_scale:20000000|name=Buenos Aires Navtex}}
+| 00:50, 04:50, 08:50, 12:50, 16:50, 20:50
+| 560
+| no
+|}
+
+== Navarea 7 – South Africa ==
+
+518&nbsp;kHz (international)
+
+{| class="wikitable sortable"
+|- class="hintergrundfarbe5"
+! Area || kHz || ID || Station || Operator || Position || class="unsortable" | Transmission times (UTC) || range || active?
+|-
+| 7 || 518
+| B
+| [[Walvis Bay]]
+| NMB
+| {{coord|23|03|23.94|S|14|37|27.6|E|type:landmark_scale:20000000|name=Walvis Bay Navtex}}
+| 00:10, 04:10, 08:10, 12:10, 16:10, 20:10
+| 378
+| yes
+|-
+| 7 || 518
+| C
+| [[Cape Town]]
+| AFS
+| {{coord|33|41|06.46|S|18|42|46.66|E|type:landmark_scale:20000000|name=Cape Town Navtex}}
+| 00:20, 04:20, 08:20, 12:20, 16:20, 20:20
+| 500
+| yes
+|-
+| 7 || 518
+| I
+| [[Port Elizabeth]]
+| AFS
+| {{coord|34|02|12.2|S|25|33|21|E|type:landmark_scale:20000000|name=Port Elizabeth Navtex}}
+| 01:20, 05:20, 09:20, 13:20, 17:20, 21:20
+| 500
+| yes
+|-
+| 7 || 518
+| O
+| [[Durban]]
+| AFS
+| {{coord|29|48|17.4|S|30|48|56.28|E|type:landmark_scale:20000000|name=Durban Navtex}}
+| 02:20, 06:20, 10:20, 14:20, 18:20, 22:20
+| 500
+| yes
+|}
+
+== Navarea 8 – India ==
+
+518&nbsp;kHz (international)
+
+{| class="wikitable sortable"
+|- class="hintergrundfarbe5"
+! Area || kHz || ID || Station || Operator || Position || class="unsortable" | Transmission times (UTC) || range || active?
+|-
+| 8 || 518
+| C
+| [[Mauritius]]
+| MAU
+| {{coord|20|10|01.52|S|57|28|41.38|E|type:landmark_scale:20000000|name=Mauritius Navtex}}
+| 00:20, 04:20, 08:20, 12:20, 16:20, 20:20
+| 400
+| yes
+|-
+| 8 || 518
+| G
+| [[Mumbai|Bombay]]
+| IND
+| {{coord|19|04|59.66|N|72|50|2.52|E|type:landmark_scale:20000000|name=Bombay Navtex}}
+| 01:00, 05:00, 09:00, 13:00, 17:00, 21:00
+| 300
+| yes
+|-
+| 8 || 518
+| P
+| [[Chennai|Madras]]
+| IND
+| {{coord|13|04|58|N|80|17|14|E|type:landmark_scale:20000000|name=Madras Navtex}}
+| 02:30, 06:30, 10:30, 14:30, 18:30, 22:30
+| 300
+| yes
+|}
+
+== Navarea 9 – Arabia ==
+
+518&nbsp;kHz (international)
+
+{| class="wikitable sortable"
+|- class="hintergrundfarbe5"
+! ID|| Station || Operator || Position || class="unsortable" | State || Transmission Times (UTC) || Range || Active
+|-
+| A
+| Bushehr
+| IRN
+| {{coord|28|57|44.01|N|50|49|22.06|E|type:landmark_scale:20000000|name=Bushehr Navtex}}
+| IR-06
+| 00:00, 04:00, 08:00, 12:00, 16:00, 20:00
+| 300
+| yes
+|-
+| B
+| Hamala
+| BHR
+| {{coord|26|09|25.8|N|50|28|35.94|E|type:landmark_scale:20000000|name=Hamala Navtex}}
+| BH
+| 00:10, 04:10, 08:10, 12:10, 16:10, 20:10
+| 300
+| yes
+|-
+
+| F
+| Bandar Abbas
+| IRN
+| {{coord|27|09|39.68|N|56|13|31.36|E|type:landmark_scale:20000000|name=Bandar Abbas Navtex}}
+| IR-23
+| 00:50, 04:50, 08:50, 12:50, 16:50, 20:50
+| 300
+| yes
+|-
+
+| H
+| Jeddah
+| ARS
+| {{coord|21|20|32|N|39|09|21|E|type:landmark_scale:20000000|name=Jeddah Navtex}}
+| SA
+| 01:10, 05:10, 09:10, 13:10, 17:10, 21:10
+| 390
+| yes
+|-
+
+| M
+| Muscat
+| OMA
+| {{coord|23|36|00|N|58|30|00|E|type:landmark_scale:20000000|name=Muscat Navtex}}
+| OM
+| 02:00, 06:00, 10:00, 14:00, 18:00, 22:00
+| 270
+| no
+|-
+
+| P
+| Karachi
+| PAK
+| {{coord|24|51|07|N|67|02|33|E|type:landmark_scale:20000000|name=Karachi Navtex}}
+| PK-SD
+| 02:30, 06:30, 10:30, 14:30, 18:30, 22:30
+| 400
+| yes
+|-
+
+| V
+| Quseir
+| EGY
+| {{coord|26|06|39.2|N|34|16|48.3|E|type:landmark_scale:20000000|name=Quseir Navtex}}
+| EG-BA
+| 03:30, 07:30, 11:30, 15:30, 19:30, 23:30
+| 400
+| yes
+|-
+
+| X
+| Serapeum (Ismailia)
+| EGY
+| {{coord|30|28|13.12|N|32|22|00.3|E|type:landmark_scale:20000000|name=Serapeum (Ismailia) Navtex}}
+| EG-IS
+| 03:50, 07:50, 11:50, 15:50, 19:50, 23:50
+| 200
+| yes
+|}
+<!-- ------------------------------------------------ -->
+
+== Navarea 10 – Australia ==
+
+No NAVTEX stations available.
+
+Australia distributes its messages (Maritime Safety Information — MSI) exclusively via [[Inmarsat-C]] via EGC (Enhanced Group Call) in SafetyNet.
+
+== Navarea 11 – East Asia ==
+
+518&nbsp;kHz (international)
+
+{| class="wikitable sortable"
+|- class="hintergrundfarbe5"
+! ID || Station || Operator || Position || class="unsortable" | Transmission times (UTC)
+!Active
+|-
+| A
+| [[Jayapura]]
+| INS
+| {{coord|02|31||S|140|43||E|type:landmark_scale:20000000|name=Jayapura Navtex}}
+| 00:00, 04:00, 08:00, 12:00, 16:00, 20:00
+|
+|-
+| B
+| [[Ambon, Maluku|Ambon]]
+| INS
+| {{coord|03|42||S|128|12||E|type:landmark_scale:20000000|name=Ambon Navtex}}
+| 00:10, 04:10, 08:10, 12:10, 16:10, 20:10
+|
+|-
+| C
+| [[Singapore]]
+| SNG
+| {{coord|01|20||N|103|42||E|type:landmark_scale:20000000|name=Singapore Navtex}}
+| 00:20, 04:20, 08:20, 12:20, 16:20, 20:20
+|
+|-
+| D
+| [[Makassar]]
+| INS
+| {{coord|05|06||S|119|26||E|type:landmark_scale:20000000|name=Makassar Navtex}}
+| 00:30, 04:30, 08:30, 12:30, 16:30, 20:30
+|
+|-
+| E
+| [[Jakarta]]
+| INS
+| {{coord|06|07||S|106|52||E|type:landmark_scale:20000000|name=Jakarta Navtex}}
+| 00:40, 04:40, 08:40, 12:40, 16:40, 20:40
+|
+|-
+| E
+| [[Hungnam]]
+| KRE
+| {{coord|39|49|59.42|N|127|41|8.16|E|type:landmark_scale:20000000|name=Hungnam Navtex}}
+| 
+|
+|-
+| F
+| [[Bangkok]]
+| THA
+| {{coord|13|01|28|N|100|01|11.04|E|type:landmark_scale:20000000|name=Bangkok Navtex}}
+| 00:50, 04:50, 08:50, 12:50, 16:50, 20:50
+|
+|-
+| G
+| [[Naha]]
+| JPN
+| {{coord|26|09||N|127|46||E|type:landmark_scale:20000000|name=Naha Navtex}}
+| 01:00, 05:00, 09:00, 13:00, 17:00, 21:00
+|
+|-
+| H
+| [[Moji-ku, Kitakyūshū|Moji]]
+| JPN
+| {{coord|33|57||N|130|58||E|type:landmark_scale:20000000|name=Moji Navtex}}
+| 01:10, 05:10, 09:10, 13:10, 17:10, 21:10
+|
+|-
+| I
+| [[Puerto Princesa]]
+| PHL
+| {{coord|09|44||N|118|43||E|type:landmark_scale:20000000|name=Puerto Princesa Navtex}}
+| 01:20, 05:20, 09:20, 13:20, 17:20, 21:20
+|
+|-
+| I
+| [[Yokohama]]
+| JPN
+| {{coord|35|26||N|139|38||E|type:landmark_scale:20000000|name=Yokohama Navtex}}
+| 01:20, 05:20, 09:20, 13:20, 17:20, 21:20
+|
+|-
+| J
+| [[Manila]]
+| PHL
+| {{coord|14|35||N|121|03||E|type:landmark_scale:20000000|name=Manila Navtex}}
+| 01:30, 05:30, 09:30, 13:30, 17:30, 21:30
+|
+|-
+| J
+| [[Otaru]]
+| JPN
+| {{coord|43|12||N|141|00||E|type:landmark_scale:20000000|name=Otaru Navtex}}
+| 01:30, 05:30, 09:30, 13:30, 17:30, 21:30
+|
+|-
+| K
+| [[Davao City]]
+| PHL
+| {{coord|07|04||N|125|36||E|type:landmark_scale:20000000|name=Davao City Navtex}}
+| 01:40, 05:40, 09:40, 13:40, 17:40, 21:40
+|
+|-
+| K
+| [[Kushiro District, Hokkaido|Kushiro]]
+| JPN
+| {{coord|42|59||N|144|23||E|type:landmark_scale:20000000|name=Kushiro Navtex}}
+| 01:40, 05:40, 09:40, 13:40, 17:40, 21:40
+|
+|-
+| L
+| [[Hongkong]]
+| HKG
+| {{coord|22|12|33|N|114|15|22|E|type:landmark_scale:20000000|name=Hongkong Navtex}}
+| 01:50, 05:50, 09:50, 13:50, 17:50, 21:50
+|
+|-
+| M
+| [[Sanya]]
+| CHN
+| {{coord|18|13|56|N|109|29|45|E|type:landmark_scale:20000000|name=Sanya Navtex}}
+| 02:00, 06:00, 10:00, 14:00, 18:00, 22:00
+|
+|-
+| N
+| [[Guangzhou]]
+| CHN
+| {{coord|23|09||N|113|29||E|type:landmark_scale:20000000|name=Guangzhou Navtex}}
+| 02:10, 06:10, 10:10, 14:10, 18:10, 22:10
+|
+|-
+| O
+| [[Fuzhou]]
+| CHN
+| {{coord|26|01|42.76|N|119|18|19.6|E|type:landmark_scale:20000000|name=Fuzhou Navtex}}
+| 02:20, 06:20, 10:20, 14:20, 18:20, 22:20
+|
+|-
+| P
+| [[Da Nang]]
+| VTN
+| {{coord|16|05||N|108|14||E|type:landmark_scale:20000000|name=Da Nang Navtex}}
+| 02:30, 06:30, 10:30, 14:30, 18:30, 22:30
+|
+|-
+| P
+| [[Chilung]]
+| TWN
+| {{coord|25|09||N|121|44||E|type:landmark_scale:20000000|name=Chilung Navtex}}
+| 02:30, 06:30, 10:30, 14:30, 18:30, 22:30
+|yes
+|-
+| P
+| [[Kaohsiung]]
+| TWN
+| {{coord|22|29||N|120|25||E|type:landmark_scale:20000000|name=Kaohsiung Navtex}}
+| 02:30, 06:30, 10:30, 14:30, 18:30, 22:30
+|no
+|-
+| Q
+| [[Shanghai]]
+| CHN
+| {{coord|31|06|32|N|121|32|39|E|type:landmark_scale:20000000|name=Shanghai Navtex}}
+| 02:40, 06:40, 10:40, 14:40, 18:40, 22:40
+|
+|-
+| R
+| [[Dalian]]
+| CHN
+| {{coord|38|50|42.88|N|121|31|05|E|type:landmark_scale:20000000|name=Dalian Navtex}}
+| 02:50, 06:50, 10:50, 14:50, 18:50, 22:50
+|
+|-
+| S
+| [[Sandakan]]
+| MLA
+| {{coord|05|53|45.19|N|118|00|10.98|E|type:landmark_scale:20000000|name=Sandakan Navtex}}
+| 03:00, 07:00, 11:00, 15:00, 19:00, 23:00
+|
+|-
+| T
+| [[Miri]]
+| MLA
+| {{coord|04|26|16.8|N|114|01|15.2|E|type:landmark_scale:20000000|name=Miri Navtex}}
+| 03:10, 07:10, 11:10, 15:10, 19:10, 23:10
+|
+|-
+| U
+| [[Penang]]
+| MLA
+| {{coord|05|25|30|N|100|24|11|E|type:landmark_scale:20000000|name=Penang Navtex}}
+| 03:20, 07:20, 11:20, 15:20, 19:20, 23:20
+|
+|-
+| V
+| [[Guam]]
+| GUM
+| {{coord|13|28|28.02|N|144|50|39.8|E|type:landmark_scale:20000000|name=Guam Navtex}}
+| 01:00, 05:00, 09:00, 13:00, 17:00, 21:00
+|
+|-
+| V
+| [[Uljin County|Jukbyeon]]
+| KOR
+| {{coord|37|03||N|129|25||E|type:landmark_scale:20000000|name=Jukbyeon Navtex}}
+| 03:30, 07:30, 11:30, 15:30, 19:30, 23:30
+|
+|-
+| W
+| [[Byeonsan]]
+| KOR
+| {{coord|35|36||N|126|29||E|type:landmark_scale:20000000|name=Byeonsan Navtex}}
+| 03:40, 07:40, 11:40, 15:40, 19:40, 23:40
+|
+|-
+| X
+| [[Ho Chi Minh City]]
+| VTN
+| {{coord|10|42|11.94|N|106|43|44.9|E|type:landmark_scale:20000000|name=Ho-Chi-Minh-City Navtex}}
+| 03:50, 07:50, 11:50, 15:50, 19:50, 23:50
+|
+|}
+
+490&nbsp;kHz (national)
+
+{| class="wikitable sortable"
+|- class="hintergrundfarbe5"
+! ID || Station || Operator || Position || class="unsortable" | Transmission times (UTC) || range || active?
+|-
+| J
+| [[Uljin County|Jukbyeon]]
+| KOR
+| {{coord|37|03||N|129|25||E|type:landmark_scale:20000000|name=Jukbyeon Navtex}}
+| 01:30, 05:30, 09:30, 13:30, 17:30, 21:30
+| 200
+| yes
+|-
+| K
+| [[P'yongsan|Byeonsan]]
+| KOR
+| {{coord|35|36||N|126|29||E|type:landmark_scale:20000000|name=Byeonsan Navtex}}
+| 01:40, 05:40, 09:40, 13:40, 17:40, 21:40
+| 200
+| yes
+|-
+| W
+| [[Haiphong|Hai Phong]]
+| VTN
+| {{coord|20|51|2.94|N|106|44|1.72|E|type:landmark_scale:20000000|name=Hai Phong Navtex}}
+| 02:30, 06:30, 10:30, 14:30, 18:30, 22:30
+| 400
+| yes
+|}
+
+424&nbsp;kHz (Transmissions in Japanese language)
+
+{| class="wikitable sortable"
+|- class="hintergrundfarbe5"
+! ID || Station || Operator || Position|| class="unsortable" | Transmission times (UTC) || range || active?
+|-
+| G
+| [[Naha]]
+| JPN
+| {{coord|26|05||N|127|40||E|type:landmark_scale:20000000|name=Naha Navtex}}
+| 00:00, 04:00, 08:00, 12:00, 16:00, 20:00
+| 400
+| yes
+|-
+| H
+| [[Moji-ku, Kitakyūshū|Moji]]
+| JPN
+| {{coord|34|01||N|130|56||E|type:landmark_scale:20000000|name=Moji Navtex}}
+| 00:17, 04:17, 08:17, 12:17, 16:17, 20:17
+| 400
+| yes
+|-
+| I
+| [[Yokohama]]
+| JPN
+| {{coord|35|14||N|139|55||E|type:landmark_scale:20000000|name=Yokohama Navtex}}
+| 00:34, 04:34, 08:34, 12:34, 16:34, 20:34
+| 400
+| yes
+|-
+| J
+| [[Otaru]]
+| JPN
+| {{coord|43|19||N|140|27||E|type:landmark_scale:20000000|name=Otaru Navtex}}
+| 00:51, 04:51, 08:51, 12:51, 16:51, 20:51
+| 400
+| yes
+|-
+| K
+| [[Kushiro District, Hokkaido|Kushiro]]
+| JPN
+| {{coord|42|57||N|144|36||E|type:landmark_scale:20000000|name=Otaru Navtex}}
+| 01:08, 05:08, 09:08, 13:08, 17:08, 21:08
+| 400
+| yes
+|}
+<!-- ------------------------------------------------ -->
+
+== Navarea 12 – Eastern Pacific ==
+
+518&nbsp;kHz (international)
+
+{| class="wikitable sortable"
+|- class="hintergrundfarbe5"
+! Area || kHz || ID || Station || Operator || Position || class="unsortable" | Transmission times (UTC) || Range || Active
+|-
+| 12 || 518
+| C
+| [[San Francisco]]
+| USA
+| {{coord|37|55|32.66|N|122|44|2.6|W|type:landmark_scale:20000000|name=San Francisco Navtex}}
+| 00:20, 04:20, 08:20, 12:20, 16:20, 20:20
+|
+|
+|-
+| 12 || 518
+| D
+| [[Prince Rupert]]
+| CAN
+| {{coord|54|17|54.67|N|130|25|3.61|W|type:landmark_scale:20000000|name=Prince Rupert Navtex}}
+| 00:30, 04:30, 08:30, 12:30, 16:30, 20:30
+|
+|
+|-
+| 12 || 518
+| H
+| [[Tofino]]
+| CAN
+| {{coord|48|55|31.72|N|125|32|25.1|W|type:landmark_scale:20000000|name=Tofino Navtex}}
+| 01:10, 05:10, 09:10, 13:10, 17:10, 21:10
+|
+|
+|-
+| 12 || 518
+| J
+| [[Kodiak, Alaska|Kodiak]]
+| ALS
+| {{coord|57|46|53.78|N|152|32|15.3|W|type:landmark_scale:20000000|name=Kodiak Navtex}}
+| 01:30, 05:30, 09:30, 13:30, 17:30, 21:30
+|
+|
+|-
+| 12 || 518
+| L
+| [[San Cristóbal Island|Ayora]]
+| EQA
+| {{coord|00|45||S|90|19||W|type:landmark_scale:20000000|name=Ayora Navtex}}
+| 01:50, 05:50, 09:50, 13:50, 17:50, 21:50
+|
+|
+|-
+| 12 || 518
+| M
+| [[Guayaquil]]
+| EQA
+| {{coord|02|17||S|80|01||W|type:landmark_scale:20000000|name=Guayaquil Navtex}}
+| 02:00, 06:00, 10:00, 14:00, 18:00, 22:00
+|
+|
+|-
+| 12 || 518
+| O
+| [[Honolulu]]
+| HWA
+| {{coord|21|26|13.27|N|158|08|35.66|W|type:landmark_scale:20000000|name=Honolulu Navtex}}
+| 02:20, 06:20, 10:20, 14:20, 18:20, 22:20
+|
+|
+|-
+| 12 || 518
+| Q
+| [[Cambria, California|Cambria]]
+| USA
+| {{coord|35|31|27.47|N|121|03|42.92|W|type:landmark_scale:20000000|name=Cambria Navtex}}
+| 02:40, 06:40, 10:40, 14:40, 18:40, 22:40
+|
+|yes
+|-
+| 12 || 518
+| W
+| [[Astoria, Oregon|Astoria]]
+| USA
+| {{coord|46|12|14.36|N|123|57|20.3|W|type:landmark_scale:20000000|name=Astoria Navtex}}
+| 03:40, 07:40, 11:40, 15:40, 19:40, 23:40
+|
+|
+|-
+| 12 || 518
+| X
+| [[Kodiak, Alaska|Kodiak]]
+| ALS
+| {{coord|57|46|53.78|N|152|32|15.3|W|type:landmark_scale:20000000|name=Kodiak Navtex}}
+| 03:50, 07:50, 11:50, 15:50, 19:50, 23:50
+|
+|
+|}
+
+490&nbsp;kHz (national)
+
+{| class="wikitable sortable"
+|- class="hintergrundfarbe5"
+! Area || kHz || ID || Station || Operator || Position || class="unsortable" | Transmission times (UTC) || Range || Active
+|-
+| 12 || 490
+| A
+| [[San Cristóbal Island|Ayora]]
+| EQA
+| {{coord|00|45||S|90|19||W|type:landmark_scale:20000000|name=Ayora Navtex}}
+| 00:00, 04:00, 08:00, 12:00, 16:00, 20:00
+|
+|
+|}
+
+== Navarea 13 – Russia ==
+
+518&nbsp;kHz (international)
+
+{| class="wikitable sortable"
+|- class="hintergrundfarbe5"
+! Area || kHz || ID || Station || Operator || Position || class="unsortable" | Transmission times (UTC) || range || active?
+|-
+| 13 || 518
+| B
+| [[Kholmsk]]
+| RUS
+| {{coord|47|01|24.8|N|142|02|42.2|E|type:landmark_scale:20000000|name=Kholmsk Navtex}}
+| 00:10, 04:10, 08:10, 12:10, 16:10, 20:10
+| 300
+| yes
+|-
+| 13 || 518
+| C
+| [[Murmansk]]
+| RUS
+| {{coord|68|51|56.89|N|33|04|14.74|E|type:landmark_scale:20000000|name=Murmansk Navtex}}
+| 00:20, 04:20, 08:20, 12:20, 16:20, 20:20
+| 300
+| yes
+|-
+| 13 || 518
+| F
+| [[Arkhangelsk]]
+| RUS
+| {{coord|64|33|22.6|N|40|33|0.1|E|type:landmark_scale:20000000|name=Arkhangelsk Navtex}}
+| 00:50, 04:50, 08:50, 12:50, 16:50, 20:50
+| 300
+| yes
+|-
+| 13 || 518
+| C
+| [[Petropavlovsk-Kamchatsky|Petropavlosk]]
+| RUS
+| {{coord|53|14|52|N|158|25|10.1|E|type:landmark_scale:20000000|name=Petropavlosk Navtex}}
+| 00:20, 04:20, 08:20, 12:20, 16:20, 20:20
+| 300
+| yes
+|-
+| 13 || 518
+| W
+| [[Astrakhan]]
+| RUS
+| {{coord|46|17|48.1|N|47|59|52|E|type:landmark_scale:20000000|name=Astrakhan Navtex}}
+| 03:40, 07:40, 11:40, 15:40, 19:40, 23:40
+| 250
+| yes
+|-
+| 13 || 518
+| A
+| [[Vladivostok]]
+| RUS
+| {{coord|43|22|53.3|N|131|53|59.5|E|type:landmark_scale:20000000|name=RF Wladiwostok Navtex}}
+| 00:00, 04:00, 08:00, 12:00, 16:00, 20:00
+| 230
+| yes
+|-
+| 13 || 518
+| G
+| [[Okhotsk]]
+| RUS
+| {{coord|59|22||N|143|12||E|type:landmark_scale:20000000|name=RF Okhotsk Navtex}}
+| 01:00, 05:00, 09:00, 13:00, 17:00, 21:00
+| 300
+| yes
+|-
+| 13 || 518
+| D
+| [[Magadan]]
+| RUS
+| {{coord|59|41||N|150|09||E|type:landmark_scale:20000000|name=RF Magadan Navtex}}
+| 00:30, 04:30, 08:30, 12:30, 16:30, 20:30
+| 120
+|
+|}
+
+== Navarea 14 – New Zealand, Southern Pacific ==
+
+No NAVTEX stations available.
+
+== Navarea 15 – Chile ==
+
+518&nbsp;kHz (international)
+
+{| class="wikitable sortable"
+|- class="hintergrundfarbe5"
+! Area || kHz || ID || Station || Operator || Position || class="unsortable" | Transmission times (UTC) || Range || Active? || Language
+|-
+| 15 || 518
+| A
+| [[Antofagasta]]
+| CHL
+| {{coord|23|29|28.8|S|70|25|29.2|W|type:landmark_scale:20000000|name=Antofagasta Navtex}}
+| 04:00, 12:00 20:00
+| 300
+| yes
+| English
+|-
+| 15 || 518
+| B
+| [[Valparaíso]]
+| CHL
+| {{coord|32|48|08|S|71|29|06|W|type:landmark_scale:20000000|name=Valparaíso Navtex}}
+| 04:10, 12:10, 20:10
+| 300
+| yes
+| English
+|-
+| 15 || 518
+| C
+| [[Talcahuano]]
+| CHL
+| {{coord|36|42|54.2|S|73|06|28.8|W|type:landmark_scale:20000000|name=Talcahuano Navtex}}
+| 04:20, 12:20, 20:20
+| 300
+| yes
+| English
+|-
+| 15 || 518
+| D
+| [[Puerto Montt]]
+| CHL
+| {{coord|41|29|23.94|S|72|57|27.88|W|type:landmark_scale:20000000|name=Puerto Montt Navtex}}
+| 04:30, 12:30, 20:30
+| 300
+| yes
+| English
+|-
+| 15 || 518
+| E
+| [[Punta Arenas]]
+| CHL
+| {{coord|52|56|53.2|S|71|03|25|W|type:landmark_scale:20000000|name=Punta Arenas Navtex}}
+| 04:40, 12:40, 20:40
+| 300
+| yes
+| English
+|-
+| 15 || 518
+| F
+| [[Easter Island]]
+| CHL
+| {{coord|27|09||S|109|25||W|type:landmark_scale:20000000|name=Osterinsel Navtex}}
+| 04:50, 12:50, 20:50
+| 300
+| yes
+| English
+|-
+| 15 || 490
+| G
+| [[Easter Island]]
+| CHL
+| {{coord|27|09||S|109|25||W|type:landmark_scale:20000000|name=Osterinsel Navtex}}
+| 00:50, 08:50, 16:50
+| 300
+| yes
+| Spanish
+|-
+| 15 || 490
+| H
+| [[Antofagasta]]
+| CHL
+| {{coord|23|29|28.8|S|70|25|29.2|W|type:landmark_scale:20000000|name=Antofagasta Navtex}}
+| 00:00, 08:00, 16:00
+| 300
+| yes
+| Spanish
+|-
+| 15 || 490
+| I
+| [[Valparaíso]]
+| CHL
+| {{coord|32|48|08|S|71|29|06|W|type:landmark_scale:20000000|name=Valparaíso Navtex}}
+| 00:10, 08:10, 16:10
+| 300
+| yes
+| Spanish
+|-
+| 15 || 490
+| J
+| [[Talcahuano]]
+| CHL
+| {{coord|36|42|54.2|S|73|06|28.8|W|type:landmark_scale:20000000|name=Talcahuano Navtex}}
+| 00:20, 08:20, 16:20
+| 300
+| yes
+| Spanish
+|-
+| 15 || 490
+| K
+| [[Puerto Montt]]
+| CHL
+| {{coord|41|29|23.94|S|72|57|27.88|W|type:landmark_scale:20000000|name=Puerto Montt Navtex}}
+| 00:30, 08:30, 16:30
+| 300
+| yes
+| Spanish
+|-
+| 15 || 490
+| L
+| [[Punta Arenas]]
+| CHL
+| {{coord|52|56|53.2|S|71|03|25|W|type:landmark_scale:20000000|name=Punta Arenas Navtex}}
+| 00:40, 08:40, 16:40
+| 300
+| yes
+| Spanish
+|}
+
+== Navarea 16 – Peru ==
+
+518&nbsp;kHz (international)
+
+{| class="wikitable sortable"
+|- class="hintergrundfarbe5"
+! Area || kHz || ID || Station || Operator || Position || class="unsortable" | Transmission times (UTC) || range || active?
+|-
+| 16 || 518.0
+| S
+| [[Paita]]
+| PRU
+| {{coord|05|05|S|81|07|W|type:landmark_scale:20000000|name=Paita Navtex}}
+| 03:00, 07:00, 11:00, 15:00, 19:00, 23:00
+| 200
+| yes
+|-
+| 16 || 518.0
+| U
+| [[Callao]]
+| PRU
+| {{coord|12|30|S|77|09|W|type:landmark_scale:20000000|name=Callao Navtex}}
+| 03:20, 07:20, 11:20, 15:20, 19:20, 23:20
+| 200
+| yes
+|-
+| 16 || 518.0
+| W
+| [[Mollendo]]
+| PRU
+| {{coord|17|01|S|72|01|W|type:landmark_scale:20000000|name=Mollendo Navtex}}
+| 03:40, 07:40, 11:40, 15:40, 19:40, 23:40
+| 200
+| yes
+|}
+
+== Navtex on 4 MHz (4209.5 kHz) ==
+
+{| class="wikitable sortable"
+|- class="hintergrundfarbe5"
+! Area || kHz || ID|| Station || Operator || Position || class="unsortable" | Transmission times (UTC) || Range || Active
+|-
+| III || 4209.5
+| M
+| [[Istanbul]]
+| TUR
+| {{coord|41|04||N|28|57||E|type:landmark_scale:20000000|name=Istanbul Navtex}}
+| 02:00, 06:00, 10:00, 14:00, 18:00, 22:00
+|
+| yes
+|-
+| III-IX || 4209.5
+| X
+| [[Ismailia|Serapeum (Ismailia)]]
+| EGY
+| {{coord|30|28|13.12|N|32|22|00.3|E|type:landmark_scale:20000000|name=Serapeum (Ismailia) Navtex}}
+| 07:50, 11:50
+|
+| yes
+|-
+| III || 4209.5
+| S
+| [[Heraklion]]
+| GRC
+| {{coord|35|19|22.3|N|25|44|56.35|E|type:landmark_scale:20000000|name=Heraklion Navtex}}
+| 03:00, 07:00, 11:00, 15:00, 19:00, 23:00
+| 
+| yes
+|-
+|-
+| IV || 4209.5
+|
+| [[Veracruz (city)|Veracruz]]
+| MEX
+| {{coord|19|09||N|96|07||W|type:landmark_scale:20000000|name=Veracruz Navtex}}
+|
+|
+| no
+|-
+| IV || 4209.5
+|
+| [[Cozumel]]
+| MEX
+| {{coord|20|16||N|86|44||W|type:landmark_scale:20000000|name=Cozumel Navtex}}
+|
+|
+| no
+|-
+| IV || 4209.5
+| G
+| [[New Orleans]]
+| USA
+| {{coord|29|53|4.65|N|89|56|44.2|W|type:landmark_scale:20000000|name=New Orleans Navtex}}
+| 03:00, 07:00, 11:00, 15:00, 19:00, 23:00
+| 425
+| yes
+|-
+| XI || 4209.5
+| Q
+| [[Shanghai]]
+| CHN
+| {{coord|31|06|32|N|121|32|39|E|type:landmark_scale:20000000|name=Shanghai Navtex}}
+| 18:40
+|
+| yes
+|-
+| XI || 4209.5
+| W
+| [[Haiphong]]
+| VTN
+| {{coord|20|44||N|106|44||E|type:landmark_scale:20000000|name=Haiphong Navtex}}
+| 02:30, 06:30, 10:30, 14:30, 18:30, 22:30
+|
+| yes
+|-
+| XII || 4209.5
+|
+| [[La Paz, Baja California Sur|La Paz]]
+| MEX
+| {{coord|24|08||N|110|17||W|type:landmark_scale:20000000|name=La Paz Navtex}}
+|
+|
+| no
+|-
+| XII || 4209.5
+|
+| [[Manzanillo, Colima|Manzanillo]]
+| MEX
+| {{coord|19|05||N|104|18||W|type:landmark_scale:20000000|name=Manzanillo Navtex}}
+|
+|
+| no
+|-
+| XII || 4209.5
+|
+| [[Salina Cruz]]
+| MEX
+| {{coord|16|09||N|95|12||W|type:landmark_scale:20000000|name=Salina Cruz Navtex}}
+|
+|
+| no
+|}
+
+== External links==
+
+Navtex station lists & information
+* http://www.ndblist.info/datamodes.htm  [https://web.archive.org/web/20120115105434/http://www.ndblist.info/navtex.htm (archive)] : NDBLIST - The NAVTEX DX Section, last updated 24 November 2011.
+* http://weather.mailasail.com/Franks-Weather/European-And-Mediterranean-Navtex-Schedules
+*https://www.guardiacostiera.gov.it/mezzi-e-tecnologie/Pages/rete-navtex.aspx Italian Navtex Stations
+
+[[Category:Navigational equipment]]
+[[Category:Maritime communication]]
+[[Category:Telegraphy]]
+[[Category:Navigational aids]]
