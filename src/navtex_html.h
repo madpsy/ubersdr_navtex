@@ -1072,12 +1072,33 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
 
 /* ---- Message modal: Identification panel ---- */
 .msg-ident-panel {
-  background: #0b1a2e; border-bottom: 1px solid #1a3a5c; padding: 14px 20px;
-  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px 28px;
+  background: #0b1a2e; border-bottom: 1px solid #1a3a5c; padding: 8px 20px;
   flex-shrink: 0; font-size: 0.8rem; color: #a0b8d8;
   max-height: 46vh; overflow-y: auto;
 }
 .msg-ident-panel.hidden { display: none; }
+/* Collapsed by default: one line saying who sent it, so the message text
+ * gets the room.  Details (facts, alternatives, map, signal metrics)
+ * open below it, and the choice is remembered. */
+.mi-summary {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap; width: 100%;
+  background: none; border: 0; padding: 2px 0; margin: 0; cursor: pointer;
+  font: inherit; color: inherit; text-align: left;
+}
+.mi-summary .mi-s-name { color: #c8dff0; font-weight: 600; }
+.mi-summary .mi-s-dim  { color: #7d8aa3; }
+.mi-summary .mi-s-warn { color: #ffc107; }
+.mi-summary .mi-s-tog {
+  margin-left: auto; color: #7ab8d8; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px;
+  border: 1px solid #1a4a6a; border-radius: 3px; padding: 1px 7px; white-space: nowrap;
+}
+.mi-summary:hover .mi-s-tog, .mi-summary:focus-visible .mi-s-tog { color: #53d8fb; border-color: #53d8fb; }
+.mi-detail {
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px 28px;
+  margin-top: 10px; padding-top: 10px; border-top: 1px solid #1a3a5c;
+}
+.mi-detail[hidden] { display: none; }
+.hist-dialog-msg.mi-collapsed .msg-metrics-panel { display: none; }
 .mi-head { display: flex; gap: 12px; align-items: center; }
 .mi-name { font-size: 1.05rem; color: #c8dff0; font-weight: 600; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .mi-sub  { color: #6a8aaa; font-size: 0.74rem; margin-top: 2px; }
@@ -1488,7 +1509,8 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
   .dd-btn { min-width: 0; width: 100%; max-width: none; }
   .hist-table thead th, .hist-table tbody td { padding: 7px 9px; }
   .hist-list-wrap { overflow-x: auto; }
-  .msg-ident-panel { grid-template-columns: minmax(0, 1fr); padding: 12px 14px; }
+  .msg-ident-panel { padding: 8px 14px; }
+  .mi-detail { grid-template-columns: minmax(0, 1fr); }
   .mi-map { height: 180px; }
   #panel-latest, #panel-stations { padding: 10px; }
   .latest-table thead th, .latest-table tbody td { padding: 6px 8px; }
@@ -2105,7 +2127,13 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
     /* The map lives inside the panel's markup, which is about to be
      * replaced: release the old Leaflet instance first. */
     dropIdentMap();
-    if (!id) { panel.className = 'msg-ident-panel hidden'; panel.innerHTML = ''; return; }
+    const dialog = panel.closest('.hist-dialog-msg');
+    if (!id) {
+      panel.className = 'msg-ident-panel hidden'; panel.innerHTML = '';
+      /* No summary bar to open them from, so the metrics stay visible. */
+      if (dialog) dialog.classList.remove('mi-collapsed');
+      return;
+    }
     const lv = identLevel(id);
     const known = lv !== 'none';
     const pct = typeof id.conf === 'number' ? Math.max(0, Math.min(100, id.conf * 100)) : 0;
@@ -2200,9 +2228,48 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
      * that would push the panel past its height and into a scroll. */
     left += '<div class="mi-map-box" id="mi-map-box"><div class="mi-map" id="mi-map" hidden></div>'
           + '<div class="mi-map-note" id="mi-map-note"></div></div>';
-    panel.innerHTML = '<div>' + left + '</div><div>' + right + '</div>' + warn;
+
+    /* The one-line summary that stands in for all of the above. */
+    const sum = [];
+    if (known && typeof id.dist_km === 'number' && id.dist_km >= 0)
+      sum.push(fmtKm(id.dist_km) + ' ' + compassPoint(id.bearing));
+    if (known && typeof id.night === 'boolean') sum.push(id.night ? 'night path' : 'day path');
+    const open = identDetailOpen();
+    const summary = '<button type="button" class="mi-summary" id="mi-summary" aria-controls="mi-detail"'
+      + ' aria-expanded="' + open + '" onclick="toggleIdentDetail()">'
+      + (known ? flagHtml(id.iso2) : '')
+      + (known ? '<span class="mi-s-name">' + escHtml(id.name) + '</span>' : '')
+      + pillHtml(id, { noPop: true })
+      + (id.provisional ? '<span class="mi-prov">provisional</span>' : '')
+      + (sum.length ? '<span class="mi-s-dim">' + sum.join(' · ') + '</span>' : '')
+      + (warn ? '<span class="mi-s-warn" title="See details">⚠︎</span>' : '')
+      + '<span class="mi-s-tog" id="mi-s-tog">' + (open ? 'Less ▴' : 'Details ▾') + '</span></button>';
+    panel.innerHTML = summary + '<div class="mi-detail" id="mi-detail"' + (open ? '' : ' hidden') + '>'
+                    + '<div>' + left + '</div><div>' + right + '</div>' + warn + '</div>';
     panel.className = 'msg-ident-panel';
-    renderIdentMap(id);
+    if (dialog) dialog.classList.toggle('mi-collapsed', !open);
+    _miIdent = id;
+    /* The map (and Leaflet itself) only when someone opens the details. */
+    if (open) renderIdentMap(id);
+  }
+
+  /* Details open/closed: a per-viewer preference, closed unless chosen. */
+  let _miIdent = null;
+  function identDetailOpen() {
+    try { return localStorage.getItem('navtex.mi.open') === '1'; } catch (e) { return false; }
+  }
+  function toggleIdentDetail() {
+    const det = document.getElementById('mi-detail');
+    if (!det) return;
+    const open = det.hidden;
+    det.hidden = !open;
+    try { localStorage.setItem('navtex.mi.open', open ? '1' : '0'); } catch (e) { /* private mode */ }
+    const btn = document.getElementById('mi-summary'), tog = document.getElementById('mi-s-tog');
+    if (btn) btn.setAttribute('aria-expanded', String(open));
+    if (tog) tog.textContent = open ? 'Less ▴' : 'Details ▾';
+    const dialog = det.closest('.hist-dialog-msg');
+    if (dialog) dialog.classList.toggle('mi-collapsed', !open);
+    if (open && !_miMap && _miIdent) renderIdentMap(_miIdent);
   }
 
   /* ---- Per-message map (Identification panel) ----
