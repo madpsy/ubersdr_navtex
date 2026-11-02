@@ -61,3 +61,19 @@ set_target_properties(ident_regression PROPERTIES CXX_EXTENSIONS OFF)
 add_test(NAME ident_regression
          COMMAND ident_regression "${CMAKE_CURRENT_SOURCE_DIR}/testdata/ident_fixture.csv"
          WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
+
+# -----------------------------------------------------------------------
+# mapdata_test: what messages say about places, for the Stations map
+# (src/navtex_mapdata.h) — positions in warnings, warning kinds, and sea-area
+# forecasts reduced to "NE 4–7 · ROUGH · POOR VIS".
+#
+# Header-only and pure, needs nothing but a C++17 compiler.
+#
+#   cmake --build build --target mapdata_test
+#   ctest --test-dir build -R mapdata --output-on-failure
+# -----------------------------------------------------------------------
+add_executable(mapdata_test mapdata_test.cpp)
+target_compile_features(mapdata_test PRIVATE cxx_std_17)
+target_include_directories(mapdata_test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../src")
+
+add_test(NAME mapdata COMMAND mapdata_test)

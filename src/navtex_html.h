@@ -1233,6 +1233,71 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
   box-shadow: none; font-family: 'Courier New', monospace;
 }
 .leaflet-tooltip-top::before { border-top-color: #2a4a7f; }
+/* Permanent station-name labels (Stations tab "Labels" toggle): text with
+ * a dark halo straight on the map rather than a boxed tooltip, so dozens
+ * of them stay readable without walling off the coastline beneath. */
+.leaflet-tooltip.stn-lbl {
+  background: transparent; border: 0; box-shadow: none; padding: 0 0 0 2px;
+  color: #dbe8f5; font-size: 0.7rem; letter-spacing: 0.3px; white-space: nowrap;
+  text-shadow: 0 0 3px #0d0d1a, 0 0 3px #0d0d1a, 1px 1px 2px #000;
+}
+.leaflet-tooltip.stn-lbl::before { display: none; }
+.leaflet-tooltip.stn-lbl .lbl-meta { color: #7d9ab8; }
+.leaflet-tooltip.stn-lbl.low { opacity: 0.5; }
+.leaflet-tooltip.stn-lbl .lbl-type { color: #b39ddb; }
+.leaflet-tooltip.stn-lbl.wrn-lbl { font-size: 0.64rem; color: #ffcc80; }
+.leaflet-tooltip.stn-lbl.wrn-lbl .lbl-meta { color: #c9a777; }
+/* Warning markers: a dark disc ringed in the warning colour with the
+ * kind's glyph, and a count when several warnings share the spot. */
+.wrn-icon {
+  width: 22px; height: 22px; box-sizing: border-box; border-radius: 50%;
+  background: rgba(13,27,42,0.92); border: 1.5px solid #ffb74d; color: #ffb74d;
+  display: flex; align-items: center; justify-content: center; position: relative;
+  box-shadow: 0 0 6px rgba(0,0,0,0.6);
+}
+.wrn-icon svg { width: 13px; height: 13px; display: block; }
+.wrn-icon.k-sar      { border-color: #e94560; color: #ff8a9b; }
+.wrn-icon.k-military { border-color: #ff7043; color: #ff8a65; }
+.wrn-icon.k-warning  { border-color: #c8d6e5; color: #e0e8f0; }
+.wrn-icon .wrn-n {
+  position: absolute; top: -7px; right: -9px; min-width: 14px; height: 14px; box-sizing: border-box;
+  background: #ffb74d; color: #111; border-radius: 7px; padding: 0 3px;
+  font: 700 9px/14px Arial, sans-serif; text-align: center;
+}
+/* Sea-area forecast boxes, centred on the area's anchor point. */
+.fc-box {
+  position: absolute; left: 0; top: 0; transform: translate(-50%, -50%);
+  background: rgba(11,22,38,0.93); border: 1px solid #2a4a7f; border-radius: 5px;
+  padding: 2px 8px 3px; box-shadow: 0 2px 8px rgba(0,0,0,0.5); text-align: center; white-space: nowrap; cursor: pointer;
+  color: #dbe8f5; font-family: 'Courier New', Courier, monospace; line-height: 1.25;
+}
+.fc-box .fc-area { font-size: 0.58rem; letter-spacing: 1px; color: #8aa4c4; text-transform: uppercase; }
+.fc-box .fc-sum  { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.3px; }
+.fc-box.gale  { border-color: #ffb74d; }
+.fc-box.gale .fc-sum { color: #ffe0b2; }
+.fc-box.storm { border-color: #e94560; }
+.fc-box.storm .fc-sum { color: #ffc4cc; }
+.fc-box.inshore { background: rgba(11,30,38,0.93); }
+/* Zoomed out (a continent in view) there is no room for words: warnings
+ * shrink to dots and the forecast boxes wait until the map is zoomed in.
+ * Warning labels need a little more room still. */
+.z-far .wrn-icon { transform: scale(0.42); border-width: 3px; background: #ffb74d; }
+.z-far .wrn-icon.k-sar { background: #e94560; }
+.z-far .wrn-icon.k-military { background: #ff7043; }
+.z-far .wrn-icon.k-warning { background: #c8d6e5; }
+.z-far .wrn-icon svg, .z-far .wrn-icon .wrn-n { display: none; }
+.z-far .fc-box { display: none; }
+.z-far .wrn-lbl, .z-mid .wrn-lbl { display: none; }
+.stn-legend .lg-hint { color: #7d8aa3; font-style: italic; }
+.stn-legend .lg-hint[hidden] { display: none; }
+/* Older than a day: dimmed, but still opaque so nothing shows through. */
+.fc-box.stale { border-style: dashed; }
+.fc-box.stale .fc-sum, .fc-box.stale.gale .fc-sum, .fc-box.stale.storm .fc-sum { color: #8a9ab0; }
+.pp-gist { color: #a0b8d8; font-size: 0.7rem; margin: 4px 0 2px; white-space: normal; }
+.pp-body { color: #c8dff0; font-size: 0.7rem; margin: 6px 0 2px; white-space: normal; }
+.pp-wrn + .pp-wrn { border-top: 1px solid #1a3a5c; margin-top: 6px; padding-top: 6px; }
+.stn-legend .lg-wrn { background: rgba(13,27,42,0.92); border: 1.5px solid #ffb74d; }
+.stn-legend .lg-fc  { border-radius: 2px; width: 12px; height: 8px; background: rgba(11,22,38,0.86); border: 1px solid #8aa4c4; }
 .pp-title { display: flex; align-items: center; gap: 7px; font-weight: 600; font-size: 0.82rem; margin-bottom: 2px; }
 .pp-sub   { color: #6a8aaa; font-size: 0.7rem; margin-bottom: 6px; }
 .pp-st    { border-top: 1px solid #1a3a5c; padding-top: 5px; margin-top: 5px; }
@@ -1731,6 +1796,15 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
       <label class="stn-toggle" title="Also show table stations that have not been heard">
         <input type="checkbox" id="stn-unheard-toggle" onchange="renderStations()"> Show unheard
       </label>
+      <label class="stn-toggle" title="Name each station on the map">
+        <input type="checkbox" id="stn-labels-toggle" checked onchange="setStnShow('labels', this.checked)"> Labels
+      </label>
+      <label class="stn-toggle" title="Navigational warnings with a position, heard in the last 3 days">
+        <input type="checkbox" id="stn-warnings-toggle" checked onchange="setStnShow('warnings', this.checked)"> Warnings
+      </label>
+      <label class="stn-toggle" title="The latest forecast for each sea area (UK Met Office and Norwegian bulletins)">
+        <input type="checkbox" id="stn-sea-toggle" checked onchange="setStnShow('sea', this.checked)"> Sea state
+      </label>
       <button class="latest-refresh-btn" onclick="fetchStations(true)">&#x1F504; Refresh</button>
       <span class="latest-last-updated" id="stn-last-updated"></span>
     </div>
@@ -1743,6 +1817,9 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
         <span><i style="background:#ffc107"></i>Last 7 days</span>
         <span><i style="background:#6a7a8a"></i>Older</span>
         <span><i class="lg-rx"></i>Receiver</span>
+        <span id="lg-wrn" hidden><i class="lg-wrn"></i>Warning</span>
+        <span id="lg-fc" hidden><i class="lg-fc"></i>Sea area forecast</span>
+        <span id="lg-hint" class="lg-hint" hidden>Zoom in for forecasts and warning details</span>
       </div>
     </div>
     <div class="stn-table-wrap" id="stn-table-wrap">
@@ -2981,6 +3058,7 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
         _replayWasDone = done;
         renderIdentHeader();
         if (activeTab === 'stations' || userInitiated) renderStations();
+        if (activeTab === 'stations') fetchMapData(!!userInitiated);
         _stationsPollT = setTimeout(fetchStations, done ? 300000 : 2000);
       })
       .catch(function() {
@@ -3047,7 +3125,69 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
   const LEAFLET_CSS = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css';
   let _leafletPromise = null;
   let _stnMap = null, _stnLayers = null, _stnMarkers = {}, _stnFitted = false;
+  let _stnOverlays = [];   /* overlay markers whose labels/boxes take part in decluttering */
   let _stnSort = { key: 'count', dir: -1 };
+  /* Map layers the toolbar switches: station-name labels, warnings and
+   * sea-area forecasts.  Each is on unless the user switched it off, and
+   * remembered per browser. */
+  const _stnShow = { labels: true, warnings: true, sea: true };
+  ['labels', 'warnings', 'sea'].forEach(function(k) {
+    try { _stnShow[k] = localStorage.getItem('navtex.stn.' + k) !== '0'; } catch (e) { /* private mode */ }
+    const cb = document.getElementById('stn-' + k + '-toggle');
+    if (cb) cb.checked = _stnShow[k];
+  });
+  function setStnShow(k, on) {
+    _stnShow[k] = !!on;
+    try { localStorage.setItem('navtex.stn.' + k, on ? '1' : '0'); } catch (e) { /* private mode */ }
+    if (on && (k === 'warnings' || k === 'sea')) fetchMapData(false);
+    renderStations();
+  }
+
+  /* ---- /api/mapdata: warnings with positions, sea-area forecasts ----
+   * Fetched with the station list while the Stations tab is open, at most
+   * once a minute.  ?map_hours= / ?map_fc_hours= on the page URL widen the
+   * windows (defaults 72 h and 36 h, the server's). */
+  let _mapData = null, _mapDataAt = 0, _mapDataBusy = false;
+  function fetchMapData(force) {
+    if (_mapDataBusy || (!force && _mapData && Date.now() - _mapDataAt < 60000)) return;
+    if (!_stnShow.warnings && !_stnShow.sea) return;
+    const pq = new URLSearchParams(location.search), qs = [];
+    if (pq.get('map_hours'))    qs.push('hours='    + encodeURIComponent(pq.get('map_hours')));
+    if (pq.get('map_fc_hours')) qs.push('fc_hours=' + encodeURIComponent(pq.get('map_fc_hours')));
+    _mapDataBusy = true;
+    fetch(apiBase() + '/api/mapdata' + (qs.length ? '?' + qs.join('&') : ''))
+      .then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function(d) {
+        _mapData = d; _mapDataAt = Date.now();
+        if (activeTab === 'stations') renderStations();
+      })
+      .catch(function() { /* the overlays are extras: the map stands without them */ })
+      .finally(function() { _mapDataBusy = false; });
+  }
+
+  /* Subject letter -> the few words a map label has room for. */
+  const SUBJECT_SHORT = { A: 'Nav warning', B: 'Met warning', C: 'Ice report', D: 'SAR', E: 'Forecast',
+    F: 'Pilot service', G: 'AIS', H: 'LORAN', J: 'SATNAV', K: 'Navaid', L: 'Nav warning',
+    T: 'Test', V: 'Special', W: 'Special', X: 'Special', Y: 'Special', Z: 'No messages' };
+
+  const WARN_KINDS = {
+    buoy:     ['Buoy',              '<path d="M7 1.5v3M4.5 4.5h5l-1 5h-3zM2 12c1.7-1.3 3.3-1.3 5 0s3.3 1.3 5 0"/>'],
+    light:    ['Light',             '<path d="M5 12.5l1-8h2l1 8zM4.5 4.5h5M7 1.5v1.5M2.5 3l1.2.8M11.5 3l-1.2.8"/>'],
+    windfarm: ['Wind farm',         '<path d="M7 13V7M7 7V1.8M7 7l4.5 2.6M7 7L2.5 9.6"/><circle cx="7" cy="7" r=".9"/>'],
+    cable:    ['Cable / pipeline',  '<path d="M1.5 9c1.8-4 3.7-4 5.5 0s3.7 4 5.5 0M1.5 9h0M12.5 9h0"/><circle cx="1.8" cy="9" r="1"/><circle cx="12.2" cy="9" r="1"/>'],
+    hazard:   ['Hazard / wreck',    '<path d="M1.5 9.5h11l-2 3h-7zM5 9.5V4l4 5.5"/>'],
+    military: ['Firing / exercise', '<circle cx="7" cy="7" r="4"/><path d="M7 1v3M7 10v3M1 7h3M10 7h3"/>'],
+    survey:   ['Survey',            '<circle cx="6" cy="6" r="3.5"/><path d="M8.6 8.6l3.6 3.6"/>'],
+    rig:      ['Rig / platform',    '<path d="M3 13V6.5h8V13M3 9.5h8M5 6.5V3h3v3.5M6.5 3V1"/>'],
+    sar:      ['Search and rescue', '<circle cx="7" cy="7" r="5"/><circle cx="7" cy="7" r="2.2"/><path d="M3.5 3.5l2 2M10.5 3.5l-2 2M3.5 10.5l2-2M10.5 10.5l-2-2"/>'],
+    tow:      ['Tow',               '<path d="M1.5 9h4l1-3h3l1 3h2M5.5 9v2.5M10.5 9v2.5"/>'],
+    warning:  ['Nav warning',       '<path d="M7 1.8l5.6 10H1.4zM7 5.8v3M7 10.4v.3"/>']
+  };
+  function warnKind(k) { return WARN_KINDS[k] || WARN_KINDS.warning; }
+  function warnSvg(k) {
+    return '<svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">'
+         + warnKind(k)[1] + '</svg>';
+  }
   let _stnRows = [];
 
   function loadLeaflet() {
@@ -3093,6 +3233,7 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
   }
 
   function enterStationsTab() {
+    fetchMapData(false);
     if (_stationsData && Date.now() - _stationsFetchedAt < 30000) renderStations();
     else {
       const w = document.getElementById('stn-table-wrap');
@@ -3316,8 +3457,11 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
       /* "Show in history" links inside popups. */
       document.getElementById('stn-map').addEventListener('click', function(ev) {
         const a = ev.target.closest('[data-hist]');
-        if (a) openHistoryForStation(a.getAttribute('data-hist'));
+        if (a) { openHistoryForStation(a.getAttribute('data-hist')); return; }
+        const m = ev.target.closest('[data-msg]');
+        if (m) viewMessage(m.getAttribute('data-msg'), m.getAttribute('data-title') || '');
       });
+      _stnMap.on('zoomend moveend', function() { stnZoomClass(); declutterStnLabels(); });
     }
     /* The panel may have been hidden when the map was created. */
     _stnMap.invalidateSize();
@@ -3363,15 +3507,37 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
       const mk = L.circleMarker([s0.lat, s0.lon], lowOnly
           ? { radius: r, color: col, weight: 1, opacity: 0.45, dashArray: '3 3', fillColor: col, fillOpacity: 0.08 }
           : { radius: r, color: col, weight: 1.5, opacity: 0.95, fillColor: col, fillOpacity: 0.35 })
-        .bindPopup(stationPopupHtml(site), { maxWidth: 280 })
-        .bindTooltip(escHtml(s0.name) + ' · ' + fmtInt(site.count) + (lowOnly ? ' · low confidence only' : ''),
-                     { direction: 'top', offset: [0, -r] })
-        .addTo(_stnLayers);
+        .bindPopup(stationPopupHtml(site), { maxWidth: 280 });
+      if (_stnShow.labels) {
+        /* "Niton · E I K · 195 km · Forecast": the site's name, every
+         * letter heard from it, how far away it is, and what it sent last. */
+        const letters = Array.from(new Set(site.list.map(function(s) { return s.letter; }))).sort();
+        const far = typeof s0.dist_km === 'number' && s0.dist_km >= 0 ? ' · ' + fmtKm(s0.dist_km) : '';
+        let newest = null;
+        site.list.forEach(function(s) { if (!newest || (s.heard.last_utc || '') > (newest.heard.last_utc || '')) newest = s; });
+        const typ = newest && newest.heard.last_subject ? SUBJECT_SHORT[newest.heard.last_subject] : '';
+        mk.bindTooltip(escHtml(s0.name) + '<span class="lbl-meta"> · ' + escHtml(letters.join(' ')) + far + '</span>'
+                       + (typ ? '<span class="lbl-type"> · ' + escHtml(typ) + '</span>' : ''),
+                       { permanent: true, direction: 'right', offset: [r + 2, 0],
+                         className: 'stn-lbl' + (lowOnly ? ' low' : '') });
+      } else {
+        mk.bindTooltip(escHtml(s0.name) + ' · ' + fmtInt(site.count) + (lowOnly ? ' · low confidence only' : ''),
+                       { direction: 'top', offset: [0, -r] });
+      }
+      mk.addTo(_stnLayers);
       if (lowOnly) mk.bringToBack();
+      mk._lblRank = (lowOnly ? 0 : 2e9) + site.count;
       _stnMarkers[k] = mk;
       (lowOnly ? lowBounds : bounds).push([s0.lat, s0.lon]);
     });
     if (!bounds.length) bounds.push.apply(bounds, lowBounds);   /* nothing trusted yet: show what there is */
+
+    _stnOverlays = [];
+    renderMapWarnings(L);
+    renderMapForecasts(L);
+    const lw = document.getElementById('lg-wrn'), lf = document.getElementById('lg-fc');
+    if (lw) lw.hidden = !(_stnShow.warnings && _mapData && _mapData.warnings && _mapData.warnings.length);
+    if (lf) lf.hidden = !(_stnShow.sea && _mapData && _mapData.forecasts && _mapData.forecasts.length);
 
     if (rx.valid && typeof rx.lat === 'number' && typeof rx.lon === 'number') {
       L.marker([rx.lat, rx.lon], {
@@ -3392,6 +3558,131 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
       else if (bounds.length === 1) _stnMap.setView(bounds[0], 5);
       else _stnMap.setView([45, 0], 2);
     }
+    stnZoomClass();
+    declutterStnLabels();
+  }
+
+  /* z-far below zoom 5, z-mid below 6: see the .z-far / .z-mid styles. */
+  function stnZoomClass() {
+    if (!_stnMap) return;
+    const z = _stnMap.getZoom(), c = _stnMap.getContainer();
+    c.classList.toggle('z-far', z < 5);
+    c.classList.toggle('z-mid', z >= 5 && z < 6);
+    const hint = document.getElementById('lg-hint');
+    if (hint) hint.hidden = !(z < 5 && _stnOverlays.length);
+  }
+
+  /* Labels that would overlap one another give way: trusted sites before
+   * low-confidence-only ones, then the busiest first.  The others return
+   * as the map is zoomed in and they find room.  Their marker stays, and
+   * still opens its popup. */
+  function declutterStnLabels() {
+    if (!_stnMap) return;
+    const items = [];
+    Object.keys(_stnMarkers).map(function(k) { return _stnMarkers[k]; }).concat(_stnOverlays).forEach(function(mk) {
+      let el = null;
+      if (mk._fcBox) el = mk.getElement && mk.getElement() && mk.getElement().querySelector('.fc-box');
+      else {
+        const tt = mk.getTooltip && mk.getTooltip();
+        el = tt && tt.options.permanent && tt.getElement && tt.getElement();
+      }
+      if (el) { el.style.visibility = ''; items.push({ el: el, rank: mk._lblRank || 0 }); }
+    });
+    /* Hidden by zoom (display: none) measures as an empty box at 0,0. */
+    for (let i = items.length - 1; i >= 0; i--) {
+      if (!items[i].el.getClientRects().length) items.splice(i, 1);
+    }
+    items.sort(function(a, b) { return b.rank - a.rank; });
+    const kept = [];
+    items.forEach(function(it) {
+      const r = it.el.getBoundingClientRect();
+      const hit = kept.some(function(q) {
+        return r.left < q.right + 4 && r.right + 4 > q.left && r.top < q.bottom && r.bottom > q.top;
+      });
+      if (hit) it.el.style.visibility = 'hidden'; else kept.push(r);
+    });
+  }
+
+  /* Warnings: one marker per spot (several warnings at one position share
+   * it, with a count), the warning's line or area drawn faintly behind. */
+  function renderMapWarnings(L) {
+    if (!_stnShow.warnings || !_mapData || !Array.isArray(_mapData.warnings)) return;
+    const spots = new Map();
+    _mapData.warnings.forEach(function(w) {
+      if (!w.pos || !w.pos.length) return;
+      let at = w.pos[0];
+      const area = w.pos.length >= 3 && w.kind !== 'cable';
+      if (w.pos.length >= 2) {
+        const style = { color: '#ffb74d', weight: 1.2, opacity: 0.65, dashArray: '4 3', interactive: false };
+        if (area) {
+          L.polygon(w.pos, Object.assign({ fillColor: '#ffb74d', fillOpacity: 0.06 }, style)).addTo(_stnLayers);
+          let la = 0, lo = 0;
+          w.pos.forEach(function(p) { la += p[0]; lo += p[1]; });
+          at = [la / w.pos.length, lo / w.pos.length];
+        } else {
+          L.polyline(w.pos, style).addTo(_stnLayers);
+        }
+      }
+      const k = at[0].toFixed(2) + ',' + at[1].toFixed(2);
+      let spot = spots.get(k);
+      if (!spot) { spot = { at: at, list: [] }; spots.set(k, spot); }
+      spot.list.push(w);
+    });
+    spots.forEach(function(spot) {
+      spot.list.sort(function(a, b) { return (b.last_utc || '').localeCompare(a.last_utc || ''); });
+      const w0 = spot.list[0], n = spot.list.length;
+      const html = '<div class="wrn-icon k-' + escHtml(w0.kind) + '">' + warnSvg(w0.kind)
+                 + (n > 1 ? '<span class="wrn-n">' + n + '</span>' : '') + '</div>';
+      let pop = '';
+      spot.list.forEach(function(w) {
+        const title = w.id + ' · ' + warnKind(w.kind)[0];
+        pop += '<div class="pp-wrn"><div class="pp-title">' + escHtml(title) + '</div>'
+             + '<div class="pp-sub">' + (w.iso2 ? flagHtml(w.iso2) : '') + escHtml(w.station || ('Unidentified, ' + w.freq_khz + ' kHz'))
+             + ' · heard ' + w.count + '× · last ' + fmtAgo(w.last_utc) + '</div>'
+             + '<div class="pp-gist">' + escHtml(w.gist || '') + '</div>'
+             + '<span class="pp-link" data-msg="' + escHtml(w.rel) + '" data-title="' + escHtml(title) + '">Open message ›</span></div>';
+      });
+      const mk = L.marker(spot.at, {
+        icon: L.divIcon({ className: '', html: html, iconSize: [22, 22], iconAnchor: [11, 11] }),
+        keyboard: false, zIndexOffset: 200
+      }).bindPopup(pop, { maxWidth: 320, maxHeight: 320 });
+      if (_stnShow.labels)
+        mk.bindTooltip(escHtml(w0.id) + '<span class="lbl-meta"> · ' + escHtml(warnKind(w0.kind)[0]) + (n > 1 ? ' +' + (n - 1) : '') + '</span>',
+                       { permanent: true, direction: 'right', offset: [13, 0], className: 'stn-lbl wrn-lbl' });
+      mk._lblRank = -1;
+      mk.addTo(_stnLayers);
+      _stnOverlays.push(mk);
+    });
+  }
+
+  /* Sea-area forecasts: a box per area with the conditions the forecast
+   * opens with.  Gale or worse anywhere in it colours the border. */
+  function renderMapForecasts(L) {
+    if (!_stnShow.sea || !_mapData || !Array.isArray(_mapData.forecasts)) return;
+    _mapData.forecasts.forEach(function(f) {
+      if (typeof f.lat !== 'number' || typeof f.lon !== 'number' || !f.summary) return;
+      const peak = Math.max(f.force_max, f.force_peak);
+      const sev = peak >= 10 ? ' storm' : peak >= 8 ? ' gale' : '';
+      const age = (Date.now() - Date.parse(f.utc)) / 3600000;
+      const cls = 'fc-box' + sev + (f.inshore ? ' inshore' : '') + (age > 24 ? ' stale' : '');
+      const html = '<div class="' + cls + '"><div class="fc-area">' + escHtml(f.area) + '</div>'
+                 + '<div class="fc-sum">' + escHtml(f.summary) + '</div></div>';
+      const title = f.area + ' forecast';
+      const pop = '<div class="pp-title">' + escHtml(f.area) + '</div>'
+                + '<div class="pp-sub">' + (f.inshore ? 'Inshore waters' : 'Sea area') + ' · from '
+                + escHtml(f.station || 'an unidentified station') + ' · ' + fmtAgo(f.utc) + '</div>'
+                + '<div class="pp-grid"><b>Opening</b><span>' + escHtml(f.summary) + '</span></div>'
+                + '<div class="pp-body">' + escHtml(f.body || '') + '</div>'
+                + '<span class="pp-link" data-msg="' + escHtml(f.rel) + '" data-title="' + escHtml(title) + '">Open message ›</span>';
+      const mk = L.marker([f.lat, f.lon], {
+        icon: L.divIcon({ className: '', html: html, iconSize: [0, 0], iconAnchor: [0, 0] }),
+        keyboard: false, zIndexOffset: 20000   /* above warnings, whatever their latitude */
+      }).bindPopup(pop, { maxWidth: 340 });
+      mk._fcBox = true;
+      mk._lblRank = 1e9 + peak * 1e6 + (f.inshore ? 0 : 1e5) - Math.min(age, 99) * 1e3;
+      mk.addTo(_stnLayers);
+      _stnOverlays.push(mk);
+    });
   }
 
   /* ---- Output actions: clear / copy / download ---- */

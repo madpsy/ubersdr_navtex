@@ -53,6 +53,7 @@
 #include "navtex_countries.h"
 #include "navtex_ident.h"
 #include "navtex_ident_facts.h"
+#include "navtex_mapdata.h"
 
 #include <algorithm>
 #include <atomic>
@@ -4057,7 +4058,7 @@ static std::string stations_json()
      * pass over 30,000 entries is a couple of milliseconds, and it can never
      * drift from what /api/history says. */
     struct Heard { int count = 0, high = 0, medium = 0; int64_t last = 0; bool has_snr = false;
-                   double best_snr = 0, sum_conf = 0; };
+                   double best_snr = 0, sum_conf = 0; char last_subject = 0; };
     std::vector<Heard> heard(NAVTEX_STATION_COUNT);
     {
         std::shared_lock<std::shared_mutex> lk(g_index_mu);
@@ -4068,7 +4069,10 @@ static std::string stations_json()
             h.count++;
             if (e.ident.level == "high") h.high++;
             else if (e.ident.level == "medium") h.medium++;
-            if (e.q.start_utc > h.last) h.last = e.q.start_utc;
+            if (e.q.start_utc > h.last) {
+                h.last = e.q.start_utc;
+                h.last_subject = (e.q.b2 >= 'A' && e.q.b2 <= 'Z') ? e.q.b2 : 0;
+            }
             if (e.q.has_snr && (!h.has_snr || e.q.snr_db > h.best_snr)) {
                 h.best_snr = e.q.snr_db;
                 h.has_snr  = true;
@@ -4125,6 +4129,9 @@ static std::string stations_json()
              * former — see renderStationsMap(). */
             j += ",\"medium\":" + std::to_string(h.medium);
             j += ",\"last_utc\":" + jstr(ts);
+            /* The subject letter of the newest message (A nav warning,
+             * E forecast, ...) — the map labels say what it last sent. */
+            j += ",\"last_subject\":" + (h.last_subject ? jstr(std::string(1, h.last_subject)) : std::string("null"));
             j += ",\"best_snr\":" + (h.has_snr ? mqtt_fmt_double(h.best_snr, 2) : std::string("null"));
             j += ",\"mean_conf\":" + mqtt_fmt_double(h.sum_conf / h.count, 3);
             j += "}";
@@ -5036,6 +5043,211 @@ static std::string history_read_file(const std::string &log_dir,
     return content;
 }
 
+/* ---------------- /api/mapdata ---------------- */
+/*
+ * What recent messages say about places, for the Stations map:
+ *
+ *   warnings   navigational / SAR warnings heard in the last `hours` that
+ *              carry at least one position — one entry per warning (station,
+ *              subject, serial), however many times it was rebroadcast, with
+ *              its kind (buoy, light, wind farm, ...; navtex_warning_kind()).
+ *              Positions further than 3,000 km from the transmitter (or the
+ *              receiver, when the sender is unknown) are dropped as garbled.
+ *   forecasts  the newest forecast for each sea area heard in the last
+ *              `fc_hours`, reduced to wind / sea state / visibility
+ *              (navtex_parse_forecasts()).
+ *
+ * The parse of each message is cached by its log path, so a file is read once;
+ * the cache keeps only what the last request used, so purged files drop out.
+ * "Recent" is by the wall clock: a warning still in force is rebroadcast at
+ * the station's scheduled times, so one not heard for days has usually been
+ * cancelled.
+ */
+struct MapParse {
+    std::vector<NavtexPos>          pos;
+    const char                     *kind = "warning";
+    std::vector<NavtexAreaForecast> fc;
+    std::string                     gist;   /* the text, header lines dropped, for the popup title */
+};
+static std::mutex                                                     g_mapparse_mu;
+static std::unordered_map<std::string, std::shared_ptr<const MapParse>> g_mapparse;
+
+static std::shared_ptr<const MapParse> map_parse(const std::string &log_dir, const std::string &rel, char subject)
+{
+    {
+        std::lock_guard<std::mutex> lk(g_mapparse_mu);
+        auto it = g_mapparse.find(rel);
+        if (it != g_mapparse.end()) return it->second;
+    }
+    auto mp = std::make_shared<MapParse>();
+    const std::string text = history_read_file(log_dir, rel);
+    if (subject == 'E') {
+        mp->fc = navtex_parse_forecasts(text);
+    } else {
+        mp->pos  = navtex_parse_positions(text);
+        mp->kind = navtex_warning_kind(text, subject);
+        /* Gist: the body without ZCZC/NNNN and the date-time-group line. */
+        std::string g;
+        size_t i = 0;
+        while (i < text.size() && g.size() < 220) {
+            size_t e = text.find('\n', i);
+            if (e == std::string::npos) e = text.size();
+            std::string ln = text.substr(i, e - i);
+            i = e + 1;
+            while (!ln.empty() && isspace((unsigned char)ln.back())) ln.pop_back();
+            size_t a = 0;
+            while (a < ln.size() && isspace((unsigned char)ln[a])) a++;
+            ln = ln.substr(a);
+            if (ln.empty() || ln.compare(0, 4, "ZCZC") == 0 || ln.compare(0, 4, "NNNN") == 0) continue;
+            if (ln.find(" UTC ") != std::string::npos && ln.size() < 24) continue;
+            if (!g.empty()) g += ' ';
+            g += ln;
+        }
+        if (g.size() > 220) g = g.substr(0, 217) + "...";
+        mp->gist = mqtt_sanitise_text(g);
+    }
+    std::lock_guard<std::mutex> lk(g_mapparse_mu);
+    g_mapparse[rel] = mp;
+    return mp;
+}
+
+static std::string map_iso(int64_t t)
+{
+    time_t tt = (time_t)t;
+    struct tm u {};
+    gmtime_r(&tt, &u);
+    char ts[40];
+    snprintf(ts, sizeof(ts), "%04d-%02d-%02dT%02d:%02d:%02dZ", u.tm_year + 1900, u.tm_mon + 1,
+             u.tm_mday, u.tm_hour, u.tm_min, u.tm_sec);
+    return ts;
+}
+
+static std::string mapdata_json(const std::string &log_dir, int hours, int fc_hours)
+{
+    const RxLocation rx = rx_snapshot();
+    const int64_t now = (int64_t)time(nullptr);
+    const int64_t cut_w = now - (int64_t)hours * 3600, cut_f = now - (int64_t)fc_hours * 3600;
+
+    struct Cand { std::string rel; NavtexIdentQuery q; int station; };
+    std::vector<Cand> cands;
+    {
+        std::shared_lock<std::shared_mutex> lk(g_index_mu);
+        for (const auto &kv : g_index) {
+            const HistoryIndexEntry &e = kv.second;
+            const char s = e.q.b2;
+            const bool warn = (s == 'A' || s == 'D' || s == 'L'), fc = (s == 'E');
+            if (!(warn && e.q.start_utc >= cut_w) && !(fc && e.q.start_utc >= cut_f)) continue;
+            const int st = (e.has_ident && ident_attributed(e.ident)) ? e.ident.r.station : -1;
+            cands.push_back({ kv.first, e.q, st });
+        }
+    }
+    /* Oldest first, so later copies and forecasts replace earlier ones. */
+    std::sort(cands.begin(), cands.end(), [](const Cand &a, const Cand &b) {
+        return a.q.start_utc != b.q.start_utc ? a.q.start_utc < b.q.start_utc : a.rel < b.rel;
+    });
+
+    struct Warn { const Cand *best = nullptr; std::shared_ptr<const MapParse> mp; std::vector<NavtexPos> pos;
+                  int64_t first = 0, last = 0; int count = 0; };
+    std::map<std::string, Warn> warns;
+    struct Fc { const Cand *c; NavtexAreaForecast f; };
+    std::map<std::string, Fc> fcs;
+    std::unordered_map<std::string, std::shared_ptr<const MapParse>> used;
+
+    for (const Cand &c : cands) {
+        auto mp = map_parse(log_dir, c.rel, c.q.b2);
+        used[c.rel] = mp;
+        if (c.q.b2 == 'E') {
+            for (const auto &f : mp->fc) fcs[NAVTEX_SEA_AREAS[f.area].label] = { &c, f };
+            continue;
+        }
+        /* Keep positions plausibly near the sender. */
+        double olat = 0, olon = 0;
+        bool have_origin = false;
+        if (c.station >= 0) { olat = NAVTEX_STATIONS[c.station].lat; olon = NAVTEX_STATIONS[c.station].lon; have_origin = true; }
+        else if (rx.valid)  { olat = rx.lat; olon = rx.lon; have_origin = true; }
+        std::vector<NavtexPos> pos;
+        for (const auto &p : mp->pos)
+            if (!have_origin || navtex_great_circle_km(olat, olon, p.lat, p.lon) <= 3000.0) pos.push_back(p);
+        if (pos.empty()) continue;
+        const std::string who = c.station >= 0 ? navtex_station_key(c.station)
+                                               : std::to_string(c.q.freq_hz) + ":" + std::string(1, c.q.b1 ? c.q.b1 : '?');
+        const std::string key = who + "|" + std::string(1, c.q.b2) + "|"
+                              + (c.q.serial >= 0 ? std::to_string(c.q.serial) : c.rel);
+        Warn &w = warns[key];
+        if (!w.count) w.first = c.q.start_utc;
+        w.count++;
+        w.last = c.q.start_utc;
+        /* The copy that yielded the most positions; the newer on a tie. */
+        if (!w.best || pos.size() >= w.pos.size()) { w.best = &c; w.mp = mp; w.pos = pos; }
+    }
+    {
+        std::lock_guard<std::mutex> lk(g_mapparse_mu);
+        g_mapparse.swap(used);
+    }
+
+    std::string j = "{\"now_utc\":" + jstr(map_iso(now));
+    j += ",\"hours\":" + std::to_string(hours) + ",\"fc_hours\":" + std::to_string(fc_hours);
+    j += ",\"warnings\":[";
+    bool first = true;
+    for (const auto &kv : warns) {
+        const Warn &w = kv.second;
+        const Cand &c = *w.best;
+        char id[8];
+        snprintf(id, sizeof(id), "%c%c%02d", c.q.b1 ? c.q.b1 : '?', c.q.b2, c.q.serial >= 0 ? c.q.serial % 100 : 0);
+        if (!first) j += ",";
+        first = false;
+        j += "{\"id\":" + jstr(c.q.serial >= 0 ? id : std::string(1, c.q.b1 ? c.q.b1 : '?') + c.q.b2);
+        j += ",\"freq_khz\":" + navtex_freq_khz_str(c.q.freq_hz);
+        if (c.station >= 0) {
+            const NavtexCountry *ct = navtex_country(NAVTEX_STATIONS[c.station].country);
+            j += ",\"station\":" + jstr(NAVTEX_STATIONS[c.station].name);
+            j += ",\"station_key\":" + jstr(navtex_station_key(c.station));
+            j += ",\"iso2\":" + (ct ? jstr(ct->iso2) : std::string("null"));
+        } else {
+            j += ",\"station\":null,\"station_key\":null,\"iso2\":null";
+        }
+        j += ",\"subject\":" + jstr(std::string(1, c.q.b2));
+        j += ",\"kind\":" + jstr(w.mp->kind);
+        j += ",\"first_utc\":" + jstr(map_iso(w.first));
+        j += ",\"last_utc\":" + jstr(map_iso(w.last));
+        j += ",\"count\":" + std::to_string(w.count);
+        j += ",\"rel\":" + jstr(c.rel);
+        j += ",\"gist\":" + jstr(w.mp->gist);
+        j += ",\"pos\":[";
+        for (size_t i = 0; i < w.pos.size() && i < 60; i++) {
+            if (i) j += ",";
+            j += "[" + mqtt_fmt_double(w.pos[i].lat, 4) + "," + mqtt_fmt_double(w.pos[i].lon, 4) + "]";
+        }
+        j += "]}";
+    }
+    j += "],\"forecasts\":[";
+    first = true;
+    for (const auto &kv : fcs) {
+        const NavtexAreaForecast &f = kv.second.f;
+        const Cand &c = *kv.second.c;
+        const NavtexSeaArea &a = NAVTEX_SEA_AREAS[f.area];
+        if (!first) j += ",";
+        first = false;
+        j += "{\"area\":" + jstr(a.label);
+        j += ",\"inshore\":" + std::string(a.inshore ? "true" : "false");
+        j += ",\"lat\":" + mqtt_fmt_double(a.lat, 3) + ",\"lon\":" + mqtt_fmt_double(a.lon, 3);
+        j += ",\"summary\":" + jstr(navtex_forecast_summary(f));
+        j += ",\"wind_dir\":" + jstr(f.wind_dir);
+        j += ",\"force_min\":" + std::to_string(f.force_min) + ",\"force_max\":" + std::to_string(f.force_max);
+        j += ",\"force_peak\":" + std::to_string(f.force_peak);
+        j += ",\"sea\":" + jstr(navtex_sea_state_name(f.sea_max));
+        j += ",\"vis\":" + std::to_string(f.vis_worst);
+        j += ",\"fog\":" + std::string(f.fog ? "true" : "false");
+        j += ",\"body\":" + jstr(mqtt_sanitise_text(f.body));
+        j += ",\"utc\":" + jstr(map_iso(c.q.start_utc));
+        j += ",\"station\":" + (c.station >= 0 ? jstr(NAVTEX_STATIONS[c.station].name) : std::string("null"));
+        j += ",\"rel\":" + jstr(c.rel);
+        j += "}";
+    }
+    j += "]}";
+    return j;
+}
+
 /* Read the .json sidecar for a .txt message file, if it exists.
  * The client supplies the .txt relative path; the server derives the .json
  * path itself — the client never names a .json file directly. */
@@ -5368,6 +5580,26 @@ int main(int argc, const char **argv)
                 resp->description = "OK";
                 resp->headers["Content-Type"] = "application/json";
                 resp->body = stations_json();
+                return resp;
+            }
+
+            /* GET /api/mapdata[?hours=72&fc_hours=36] — recent warnings with
+             * positions and the newest forecast per sea area, for the map.
+             * See mapdata_json(). */
+            if (path_only == "/api/mapdata") {
+                int hours = 72, fc_hours = 36;
+                if (qpos != std::string::npos) {
+                    std::string v;
+                    if (query_param(path.substr(qpos + 1), "hours", v) && !v.empty()) hours = atoi(v.c_str());
+                    if (query_param(path.substr(qpos + 1), "fc_hours", v) && !v.empty()) fc_hours = atoi(v.c_str());
+                }
+                hours    = std::max(1, std::min(hours, 24 * 90));
+                fc_hours = std::max(1, std::min(fc_hours, 24 * 90));
+                resp->statusCode  = 200;
+                resp->description = "OK";
+                resp->headers["Content-Type"] = "application/json";
+                resp->body = log_dir.empty() ? std::string("{\"warnings\":[],\"forecasts\":[],\"logging\":false}")
+                                             : mapdata_json(log_dir, hours, fc_hours);
                 return resp;
             }
 

@@ -389,7 +389,8 @@ more, on top of the identification itself.
 | `GET /api/history` | As before, plus `st` per message: `{key, name, iso2, country_name, navarea, conf, level, dist_km, bearing, night}`; `st: null, st_pending: true` until identified; `{"level":"none","key":null}` when unattributed |
 | `GET /api/ident?rel=<path>` | The full identification of one message (station, confidence, distance, members, alternatives, facts) |
 | `GET /api/latest` | As before, each entry with an `ident` object |
-| `GET /api/stations` | Receiver location, replay progress, and every table station with distance, schedule and `heard` statistics |
+| `GET /api/stations` | Receiver location, replay progress, and every table station with distance, schedule and `heard` statistics (including `last_subject`, the subject letter of its newest message) |
+| `GET /api/mapdata[?hours=72&fc_hours=36]` | For the map: navigational and SAR warnings heard in the last `hours` that carry positions (one per warning however often it was repeated, with its kind — buoy, light, wind farm, cable, …), and the newest forecast for each sea area heard in the last `fc_hours`, reduced to wind, sea state and visibility |
 | `GET /flags/<iso2>.svg` | Country flag, embedded in the binary (works offline) |
 | `GET /api/analytics[?from=&to=]` | Every identified message as compact columnar JSON (time, frequency, station, confidence, distance, bearing, path, SNR, duration, failed characters) for the Metrics view; `from`/`to` are optional unix seconds |
 
@@ -403,6 +404,18 @@ regenerations of the station table, unlike its index.
 The browser WebSocket gains frame `0x05`: `[0x05][channel][JSON ident]`, sent
 provisionally (`"provisional": true`) as soon as the header is decoded and
 finally when the message completes.
+
+**Stations map.** Each station is labelled with its name, letters, distance
+and what it sent last; labels that would overlap give way to busier stations
+and return as you zoom in. Two more layers, each with its own toggle: recent
+**warnings** at the positions they give, with an icon for what they concern,
+and **sea-area forecasts** — a box per area with the conditions the forecast
+opens with (e.g. `NE 4–6 · SLIGHT–MODERATE · UP TO GALE 8`), bordered amber
+for a gale and red for a storm anywhere in it. Forecasts are read from Met
+Office shipping and inshore waters bulletins and the Norwegian Meteorological
+Institute's named areas (`src/navtex_mapdata.h`); other formats are not parsed
+yet. Box positions are fixed points in each area, not area boundaries. Add
+`?map_hours=` / `?map_fc_hours=` to the page URL to widen the windows.
 
 **Maps.** The Stations tab, the Metrics view's Coverage tab and each message's
 Identification panel draw maps with Leaflet (from cdnjs) over OpenStreetMap
