@@ -26,6 +26,7 @@ services:
       # Point these at your own tile server, e.g. on an offline LAN:
       # NAVTEX_MAP_TILES: "https://tiles.example.lan/{z}/{x}/{y}.png"
       # NAVTEX_MAP_ATTRIBUTION: "&copy; OpenStreetMap contributors"
+      # NAVTEX_MAP_SEAMARKS: "https://tiles.example.lan/seamark/{z}/{x}/{y}.png"  # OpenSeaMap overlay
       # UI_PASSWORD: ""   # Set a password to enable write actions in the web UI.
                           # Leave empty (default) to disable all write actions.
     volumes:

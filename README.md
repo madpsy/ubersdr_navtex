@@ -48,6 +48,7 @@ All configuration is via environment variables in `docker-compose.yml`:
 | `NAVTEX_RX_LAT` / `NAVTEX_RX_LON` | *(unset)* | Receiver position in decimal degrees, for station identification. Only needed if UberSDR has no GPS position set; overrides it when both are given. **The position is published** — see [Receiver location](#station-identification). |
 | `NAVTEX_MAP_TILES` | *(OpenStreetMap)* | Leaflet tile URL template for the web UI's maps, e.g. `https://tiles.example.lan/{z}/{x}/{y}.png`. Default `https://tile.openstreetmap.org/{z}/{x}/{y}.png`. |
 | `NAVTEX_MAP_ATTRIBUTION` | *(OpenStreetMap credit)* | HTML credit line shown on the maps for those tiles. Set it whenever you set `NAVTEX_MAP_TILES`. |
+| `NAVTEX_MAP_SEAMARKS` | *(OpenSeaMap)* | Tile URL template for the Stations map's sea-mark overlay (the "Sea marks" checkbox). Default `https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png`. |
 
 Both frequencies are **always monitored simultaneously** — there is no single-frequency mode.
 
@@ -420,7 +421,9 @@ yet. Box positions are fixed points in each area, not area boundaries. Add
 **Maps.** The Stations tab, the Metrics view's Coverage tab and each message's
 Identification panel draw maps with Leaflet (from cdnjs) over OpenStreetMap
 tiles, darkened in the page. Set `NAVTEX_MAP_TILES` and `NAVTEX_MAP_ATTRIBUTION`
-to use your own tile server instead. Without internet access the maps hide
+to use your own tile server instead. The Stations map also overlays
+OpenSeaMap's sea marks (buoys, lights, harbours) from zoom 6 in; the "Sea marks"
+checkbox turns them off, and `NAVTEX_MAP_SEAMARKS` points them elsewhere. Without internet access the maps hide
 themselves and the tables, charts and identification details still work.
 
 ### How it decides, and how far to trust it

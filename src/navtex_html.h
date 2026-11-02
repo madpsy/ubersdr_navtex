@@ -1245,59 +1245,85 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
 .leaflet-tooltip.stn-lbl .lbl-meta { color: #7d9ab8; }
 .leaflet-tooltip.stn-lbl.low { opacity: 0.5; }
 .leaflet-tooltip.stn-lbl .lbl-type { color: #b39ddb; }
-.leaflet-tooltip.stn-lbl.wrn-lbl { font-size: 0.64rem; color: #ffcc80; }
-.leaflet-tooltip.stn-lbl.wrn-lbl .lbl-meta { color: #c9a777; }
-/* Warning markers: a dark disc ringed in the warning colour with the
- * kind's glyph, and a count when several warnings share the spot. */
+.leaflet-tooltip.stn-lbl.wrn-lbl { font-size: 0.64rem; color: #fdf3e1; }
+.leaflet-tooltip.stn-lbl.wrn-lbl .lbl-meta { color: #e0a874; }
+/* Station markers are SVG in a divIcon: only the drawn halves take clicks. */
+.stn-mk { pointer-events: none !important; }
+.stn-mk svg { display: block; overflow: visible; }
+.stn-mk path, .stn-mk circle { pointer-events: visiblePainted; cursor: pointer; }
+/* Warning markers: a light diamond edged in the kind's colour with the
+ * kind's glyph in dark ink.  Several warnings at one spot show as a
+ * stack of diamonds; the label says how many. */
 .wrn-icon {
-  width: 22px; height: 22px; box-sizing: border-box; border-radius: 50%;
-  background: rgba(13,27,42,0.92); border: 1.5px solid #ffb74d; color: #ffb74d;
-  display: flex; align-items: center; justify-content: center; position: relative;
-  box-shadow: 0 0 6px rgba(0,0,0,0.6);
+  --wk: #f08c2e;
+  width: 32px; height: 32px; position: relative; color: #1a2433;
+  display: flex; align-items: center; justify-content: center;
 }
-.wrn-icon svg { width: 13px; height: 13px; display: block; }
-.wrn-icon.k-sar      { border-color: #e94560; color: #ff8a9b; }
-.wrn-icon.k-military { border-color: #ff7043; color: #ff8a65; }
-.wrn-icon.k-warning  { border-color: #c8d6e5; color: #e0e8f0; }
-.wrn-icon .wrn-n {
-  position: absolute; top: -7px; right: -9px; min-width: 14px; height: 14px; box-sizing: border-box;
-  background: #ffb74d; color: #111; border-radius: 7px; padding: 0 3px;
-  font: 700 9px/14px Arial, sans-serif; text-align: center;
+.wrn-icon .wrn-bg, .wrn-icon.multi::before, .wrn-icon.multi3::after {
+  content: ''; position: absolute; left: 4px; top: 4px; width: 24px; height: 24px; box-sizing: border-box;
+  transform: rotate(45deg); border-radius: 3px;
+  background: #fdf3e1; border: 2px solid var(--wk);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.6);
 }
-/* Sea-area forecast boxes, centred on the area's anchor point. */
+.wrn-icon.multi::before  { transform: translate(4px, -4px) rotate(45deg); background: #c9bda8; }
+.wrn-icon.multi3::after  { transform: translate(8px, -8px) rotate(45deg); background: #9c927f; z-index: -1; }
+.wrn-icon.multi::before  { z-index: 0; }
+.wrn-icon .wrn-bg { z-index: 1; }
+.wrn-icon svg { width: 18px; height: 18px; display: block; position: relative; z-index: 2; stroke-width: 1.5; }
+.wrn-icon.k-sar      { --wk: #e94560; }
+.wrn-icon.k-military { --wk: #d9480f; }
+.wrn-icon.k-warning  { --wk: #8aa4c4; }
+/* Sea-area forecast badges, centred on the area's anchor point: one line,
+ * the area's name in a tinted tab and the opening conditions beside it.
+ * The tab's colour is the severity: sea green, amber for gale, red for
+ * storm.  Inshore waters have a lighter body. */
 .fc-box {
+  --fs: #3fa892;
   position: absolute; left: 0; top: 0; transform: translate(-50%, -50%);
-  background: rgba(11,22,38,0.93); border: 1px solid #2a4a7f; border-radius: 5px;
-  padding: 2px 8px 3px; box-shadow: 0 2px 8px rgba(0,0,0,0.5); text-align: center; white-space: nowrap; cursor: pointer;
-  color: #dbe8f5; font-family: 'Courier New', Courier, monospace; line-height: 1.25;
+  display: flex; align-items: stretch; white-space: nowrap; cursor: pointer;
+  background: rgba(16,20,28,0.94); border-radius: 10px; overflow: hidden;
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.08), 0 2px 6px rgba(0,0,0,0.55);
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; line-height: 1;
 }
-.fc-box .fc-area { font-size: 0.58rem; letter-spacing: 1px; color: #8aa4c4; text-transform: uppercase; }
-.fc-box .fc-sum  { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.3px; }
-.fc-box.gale  { border-color: #ffb74d; }
-.fc-box.gale .fc-sum { color: #ffe0b2; }
-.fc-box.storm { border-color: #e94560; }
-.fc-box.storm .fc-sum { color: #ffc4cc; }
-.fc-box.inshore { background: rgba(11,30,38,0.93); }
+.fc-box .fc-area {
+  background: var(--fs); color: #0d141c; padding: 4px 6px 4px 8px;
+  font-size: 0.56rem; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase;
+  display: flex; align-items: center;
+}
+.fc-box .fc-sum  { color: #e6eef6; padding: 4px 9px 4px 7px; font-size: 0.66rem; font-weight: 600; display: flex; align-items: center; }
+.fc-box.gale  { --fs: #ffc94d; }
+.fc-box.storm { --fs: #ff5a6e; }
+.fc-box.storm .fc-sum { color: #ffd0d6; }
+.fc-box.inshore { background: rgba(30,40,52,0.94); }
+.fc-box.inshore .fc-area { font-style: italic; }
 /* Zoomed out (a continent in view) there is no room for words: warnings
  * shrink to dots and the forecast boxes wait until the map is zoomed in.
  * Warning labels need a little more room still. */
-.z-far .wrn-icon { transform: scale(0.42); border-width: 3px; background: #ffb74d; }
-.z-far .wrn-icon.k-sar { background: #e94560; }
-.z-far .wrn-icon.k-military { background: #ff7043; }
-.z-far .wrn-icon.k-warning { background: #c8d6e5; }
-.z-far .wrn-icon svg, .z-far .wrn-icon .wrn-n { display: none; }
+.z-far .wrn-icon { transform: scale(0.4); }
+.z-far .wrn-icon .wrn-bg { background: var(--wk); border-color: #fdf3e1; border-width: 1.5px; }
+.z-far .wrn-icon svg, .z-far .wrn-icon::before, .z-far .wrn-icon::after { display: none; }
 .z-far .fc-box { display: none; }
 .z-far .wrn-lbl, .z-mid .wrn-lbl { display: none; }
 .stn-legend .lg-hint { color: #7d8aa3; font-style: italic; }
 .stn-legend .lg-hint[hidden] { display: none; }
 /* Older than a day: dimmed, but still opaque so nothing shows through. */
-.fc-box.stale { border-style: dashed; }
-.fc-box.stale .fc-sum, .fc-box.stale.gale .fc-sum, .fc-box.stale.storm .fc-sum { color: #8a9ab0; }
+/* Older than a day: the tab greys out, the text dims. */
+.fc-box.stale .fc-area { background: color-mix(in srgb, var(--fs) 35%, #5a6573); }
+.fc-box.stale .fc-sum, .fc-box.stale.storm .fc-sum { color: #8a9ab0; }
 .pp-gist { color: #a0b8d8; font-size: 0.7rem; margin: 4px 0 2px; white-space: normal; }
 .pp-body { color: #c8dff0; font-size: 0.7rem; margin: 6px 0 2px; white-space: normal; }
 .pp-wrn + .pp-wrn { border-top: 1px solid #1a3a5c; margin-top: 6px; padding-top: 6px; }
-.stn-legend .lg-wrn { background: rgba(13,27,42,0.92); border: 1.5px solid #ffb74d; }
-.stn-legend .lg-fc  { border-radius: 2px; width: 12px; height: 8px; background: rgba(11,22,38,0.86); border: 1px solid #8aa4c4; }
+.stn-legend .lg-wrn { width: 7px; height: 7px; margin: 0 1px; border-radius: 1px; transform: rotate(45deg);
+                      background: #fdf3e1; border: 1.5px solid #f08c2e; }
+.stn-legend .lg-f518 { background: #ffb68f; }
+.stn-legend .lg-f490 { background: #8fe0c4; }
+.stn-legend .lg-half { background: linear-gradient(90deg, #ffb68f 0 45%, transparent 45% 55%, #8fe0c4 55%); }
+.stn-legend .lg-half-n { background: linear-gradient(90deg, #ffb68f 0 45%, transparent 45%); border-style: dashed; }
+.stn-legend .lg-ring { background: transparent; border-width: 2px; border-style: solid; width: 7px; height: 7px; }
+.stn-legend .lg-sub { color: #7d8aa3; margin-top: 2px; }
+.stn-legend .lg-fc  { border-radius: 4px; width: 14px; height: 8px; border: 0;
+                      background: linear-gradient(90deg, #3fa892 0 40%, rgba(16,20,28,0.94) 40%);
+                      box-shadow: 0 0 0 1px rgba(255,255,255,0.25); }
 .pp-title { display: flex; align-items: center; gap: 7px; font-weight: 600; font-size: 0.82rem; margin-bottom: 2px; }
 .pp-sub   { color: #6a8aaa; font-size: 0.7rem; margin-bottom: 6px; }
 .pp-st    { border-top: 1px solid #1a3a5c; padding-top: 5px; margin-top: 5px; }
@@ -1805,6 +1831,9 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
       <label class="stn-toggle" title="The latest forecast for each sea area (UK Met Office and Norwegian bulletins)">
         <input type="checkbox" id="stn-sea-toggle" checked onchange="setStnShow('sea', this.checked)"> Sea state
       </label>
+      <label class="stn-toggle" title="OpenSeaMap's sea marks: buoys, lights, harbours (zoom in to see them)">
+        <input type="checkbox" id="stn-seamarks-toggle" checked onchange="setStnShow('seamarks', this.checked)"> Sea marks
+      </label>
       <button class="latest-refresh-btn" onclick="fetchStations(true)">&#x1F504; Refresh</button>
       <span class="latest-last-updated" id="stn-last-updated"></span>
     </div>
@@ -1812,10 +1841,15 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
     <div class="stn-map-wrap" id="stn-map-wrap">
       <div id="stn-map"></div>
       <div class="stn-legend" id="stn-legend">
-        <span><i style="background:#4caf50"></i>Heard in the last hour</span>
-        <span><i style="background:#53d8fb"></i>Last 24 hours</span>
-        <span><i style="background:#ffc107"></i>Last 7 days</span>
-        <span><i style="background:#6a7a8a"></i>Older</span>
+        <span><i class="lg-f518"></i>518 kHz</span>
+        <span><i class="lg-f490"></i>490 kHz</span>
+        <span><i class="lg-half"></i>Both (518 left, 490 right)</span>
+        <span><i class="lg-half-n"></i>Empty half: not heard on that one</span>
+        <span class="lg-sub">Ring: last heard on either</span>
+        <span><i class="lg-ring" style="border-color:#4caf50"></i>Last hour</span>
+        <span><i class="lg-ring" style="border-color:#53d8fb"></i>Last 24 hours</span>
+        <span><i class="lg-ring" style="border-color:#ffc107"></i>Last 7 days</span>
+        <span><i class="lg-ring" style="border-color:#6a7a8a"></i>Older</span>
         <span><i class="lg-rx"></i>Receiver</span>
         <span id="lg-wrn" hidden><i class="lg-wrn"></i>Warning</span>
         <span id="lg-fc" hidden><i class="lg-fc"></i>Sea area forecast</span>
@@ -3127,11 +3161,11 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
   let _stnMap = null, _stnLayers = null, _stnMarkers = {}, _stnFitted = false;
   let _stnOverlays = [];   /* overlay markers whose labels/boxes take part in decluttering */
   let _stnSort = { key: 'count', dir: -1 };
-  /* Map layers the toolbar switches: station-name labels, warnings and
-   * sea-area forecasts.  Each is on unless the user switched it off, and
-   * remembered per browser. */
-  const _stnShow = { labels: true, warnings: true, sea: true };
-  ['labels', 'warnings', 'sea'].forEach(function(k) {
+  /* Map layers the toolbar switches: station-name labels, warnings,
+   * sea-area forecasts and OpenSeaMap's sea marks.  Each is on unless the
+   * user switched it off, and remembered per browser. */
+  const _stnShow = { labels: true, warnings: true, sea: true, seamarks: true };
+  ['labels', 'warnings', 'sea', 'seamarks'].forEach(function(k) {
     try { _stnShow[k] = localStorage.getItem('navtex.stn.' + k) !== '0'; } catch (e) { /* private mode */ }
     const cb = document.getElementById('stn-' + k + '-toggle');
     if (cb) cb.checked = _stnShow[k];
@@ -3139,6 +3173,7 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
   function setStnShow(k, on) {
     _stnShow[k] = !!on;
     try { localStorage.setItem('navtex.stn.' + k, on ? '1' : '0'); } catch (e) { /* private mode */ }
+    if (k === 'seamarks') { syncSeamarks(); return; }
     if (on && (k === 'warnings' || k === 'sea')) fetchMapData(false);
     renderStations();
   }
@@ -3170,22 +3205,37 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
     F: 'Pilot service', G: 'AIS', H: 'LORAN', J: 'SATNAV', K: 'Navaid', L: 'Nav warning',
     T: 'Test', V: 'Special', W: 'Special', X: 'Special', Y: 'Special', Z: 'No messages' };
 
+  /* Warning glyphs, drawn on a 20-unit grid in currentColor: strokes for
+   * outlines, a light tint (T) for bodies, solid (S) for small details. */
+  const T = ' fill="currentColor" fill-opacity=".22"', S = ' fill="currentColor" stroke="none"';
+  const WAVE = (y) => '<path d="M3.7 ' + y + 'c1.4-1 2.8-1 4.2 0s2.8 1 4.2 0 2.8-1 4.2 0"/>';
   const WARN_KINDS = {
-    buoy:     ['Buoy',              '<path d="M7 1.5v3M4.5 4.5h5l-1 5h-3zM2 12c1.7-1.3 3.3-1.3 5 0s3.3 1.3 5 0"/>'],
-    light:    ['Light',             '<path d="M5 12.5l1-8h2l1 8zM4.5 4.5h5M7 1.5v1.5M2.5 3l1.2.8M11.5 3l-1.2.8"/>'],
-    windfarm: ['Wind farm',         '<path d="M7 13V7M7 7V1.8M7 7l4.5 2.6M7 7L2.5 9.6"/><circle cx="7" cy="7" r=".9"/>'],
-    cable:    ['Cable / pipeline',  '<path d="M1.5 9c1.8-4 3.7-4 5.5 0s3.7 4 5.5 0M1.5 9h0M12.5 9h0"/><circle cx="1.8" cy="9" r="1"/><circle cx="12.2" cy="9" r="1"/>'],
-    hazard:   ['Hazard / wreck',    '<path d="M1.5 9.5h11l-2 3h-7zM5 9.5V4l4 5.5"/>'],
-    military: ['Firing / exercise', '<circle cx="7" cy="7" r="4"/><path d="M7 1v3M7 10v3M1 7h3M10 7h3"/>'],
-    survey:   ['Survey',            '<circle cx="6" cy="6" r="3.5"/><path d="M8.6 8.6l3.6 3.6"/>'],
-    rig:      ['Rig / platform',    '<path d="M3 13V6.5h8V13M3 9.5h8M5 6.5V3h3v3.5M6.5 3V1"/>'],
-    sar:      ['Search and rescue', '<circle cx="7" cy="7" r="5"/><circle cx="7" cy="7" r="2.2"/><path d="M3.5 3.5l2 2M10.5 3.5l-2 2M3.5 10.5l2-2M10.5 10.5l-2-2"/>'],
-    tow:      ['Tow',               '<path d="M1.5 9h4l1-3h3l1 3h2M5.5 9v2.5M10.5 9v2.5"/>'],
-    warning:  ['Nav warning',       '<path d="M7 1.8l5.6 10H1.4zM7 5.8v3M7 10.4v.3"/>']
+    buoy:     ['Buoy',              '<circle cx="10" cy="3.2" r="1.6"' + S + '/><path d="M10 4.8V7"/>'
+                                  + '<path d="M6.5 7h7l-1.3 7H7.8z"' + T + '/><path d="M7.1 10.5h5.8"/>' + WAVE(17)],
+    light:    ['Lighthouse',        '<path d="M7.6 18l1.2-10h2.4l1.2 10z"' + T + '/><path d="M8.2 13h3.6M7 8h6M5 18h10"/>'
+                                  + '<path d="M8.5 8V5.5h3V8"/><path d="M8 5.5h4l-2-2z"' + S + '/>'
+                                  + '<path d="M6 4.6L2.8 3.6M6 6.8L2.8 7.8M14 4.6l3.2-1M14 6.8l3.2 1"/>'],
+    windfarm: ['Wind farm',         '<path d="M8 7.5V18M8 7.5V2.5M8 7.5l4.3 2.5M8 7.5L3.7 10"/><circle cx="8" cy="7.5" r="1.2"' + S + '/>'
+                                  + '<path d="M15.5 11v7M15.5 11V8.3M15.5 11l2.3 1.4M15.5 11l-2.3 1.4M4 18h13"/>'],
+    cable:    ['Cable / pipeline',  '<path d="M4 10c2-4.5 4-4.5 6 0s4 4.5 6 0"/>'
+                                  + '<rect x="1.5" y="8.5" width="2.5" height="3" rx=".5"' + S + '/><rect x="16" y="8.5" width="2.5" height="3" rx=".5"' + S + '/>'
+                                  + '<path d="M5 15.5h10" stroke-dasharray="2 1.6"/>'],
+    hazard:   ['Hazard / wreck',    WAVE(4.5) + '<path d="M3.5 12.5h13l-2.2 3.5H5.7z"' + T + '/><path d="M7 13l2.5-5.5M12 13l2-4"/>'],
+    military: ['Firing / exercise', '<circle cx="10" cy="10" r="6"/><circle cx="10" cy="10" r="2.6"/><circle cx="10" cy="10" r=".9"' + S + '/>'
+                                  + '<path d="M10 1.5v4M10 14.5v4M1.5 10h4M14.5 10h4"/>'],
+    survey:   ['Survey',            '<path d="M3 7h14l-2 3H5z"' + T + '/><path d="M8 7V4.5h4V7M10 4.5V2.5"/>'
+                                  + '<path d="M10 10l-5 7.5M10 10l5 7.5" stroke-dasharray="1.6 1.4"/><path d="M6.6 15q3.4 1.6 6.8 0M5.3 17.3q4.7 2 9.4 0"/>'],
+    rig:      ['Rig / platform',    '<path d="M3 9h14v2.5H3z"' + T + '/><path d="M4.5 11.5v7M15.5 11.5v7M9 9l1.5-7L12 9M9.5 6.5h2"/>'
+                                  + '<path d="M13.5 9V7h3v2"' + S + '/>' + WAVE(15)],
+    sar:      ['Search and rescue', '<circle cx="10" cy="10" r="7"/><circle cx="10" cy="10" r="3.5"/>'
+                                  + '<path d="M5.4 5.4l2.2 2.2M14.6 5.4l-2.2 2.2M5.4 14.6l2.2-2.2M14.6 14.6l-2.2-2.2" stroke-width="3" stroke-linecap="butt"/>'],
+    tow:      ['Tow',               '<path d="M1.5 11h6.5l-1.2 2.5H2.5z"' + T + '/><path d="M3.5 11V8.5H6V11M4.5 8.5V6.8"/>'
+                                  + '<path d="M8 10.5c2 1 3 1 4.5 0" stroke-dasharray="1.2 1"/><path d="M12.5 10.5h6l-1 3h-4z"' + T + '/><path d="M13.5 10.5v-2h4v2"/>' + WAVE(16.5)],
+    warning:  ['Nav warning',       '<path d="M10 3.5l6.8 12.5H3.2z"' + T + '/><path d="M10 8.2v3.8"/><circle cx="10" cy="14" r="1"' + S + '/>']
   };
   function warnKind(k) { return WARN_KINDS[k] || WARN_KINDS.warning; }
   function warnSvg(k) {
-    return '<svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">'
+    return '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">'
          + warnKind(k)[1] + '</svg>';
   }
   let _stnRows = [];
@@ -3230,6 +3280,23 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
     const attr = (typeof window._MAP_ATTRIBUTION === 'string' && window._MAP_ATTRIBUTION)
       || '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
     return L.tileLayer(url, { maxZoom: 19, attribution: attr, className: 'map-tiles-dark' });
+  }
+
+  /* OpenSeaMap's sea marks: transparent tiles over the base map, in their
+   * own colours (not darkened, so lights and buoys keep their meaning).
+   * They only exist from about zoom 9 in.  NAVTEX_MAP_SEAMARKS, injected as
+   * window._MAP_SEAMARKS, points at another tile server. */
+  let _seamarkLayer = null;
+  function syncSeamarks() {
+    if (!_stnMap || !window.L) return;
+    if (!_seamarkLayer) {
+      const url = (typeof window._MAP_SEAMARKS === 'string' && window._MAP_SEAMARKS)
+        || 'https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png';
+      _seamarkLayer = L.tileLayer(url, { maxZoom: 19, maxNativeZoom: 18, minZoom: 6, opacity: 0.95,
+        attribution: 'Sea marks &copy; <a href="https://www.openseamap.org">OpenSeaMap</a> contributors' });
+    }
+    if (_stnShow.seamarks && !_stnMap.hasLayer(_seamarkLayer)) _seamarkLayer.addTo(_stnMap);
+    else if (!_stnShow.seamarks && _stnMap.hasLayer(_seamarkLayer)) _stnMap.removeLayer(_seamarkLayer);
   }
 
   function enterStationsTab() {
@@ -3400,7 +3467,10 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
     });
   })();
 
-  function siteKey(s) { return Number(s.lat).toFixed(2) + ',' + Number(s.lon).toFixed(2); }
+  /* One marker per station: by name and country rather than position,
+   * because a station's 490 kHz transmitter is sometimes listed a few km
+   * from its 518 kHz one (Niton, Oostende) and should share its marker. */
+  function siteKey(s) { return String(s.name || '') + '|' + String(s.iso2 || s.country || ''); }
 
   function focusStationOnMap(s) {
     if (!_stnMap) return;
@@ -3446,6 +3516,39 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
     return typeof h.medium === 'number' ? (h.high + h.medium) > 0 : h.high > 0;
   }
 
+  /* Station marker colours: the fill says which frequency, the ring says
+   * how recently the station was heard on either (recencyColour). */
+  const FREQ_COL = { 518: '#ffb68f', 490: '#8fe0c4' };
+
+  /* A site's marker.  fills is [colour] for a site on one frequency, or
+   * [518 colour, 490 colour] for one that sends on both: the disc inside
+   * the ring is cut down the middle, 518 kHz on the left and 490 kHz on
+   * the right.  A null fill is a frequency the site sends on but that has
+   * not been heard: left empty, with a faint dashed edge.  The ring
+   * around it is in the recency colour of the newest message on either. */
+  function siteMarkerSvg(r, fills, ring, lowOnly) {
+    const c = Math.ceil(r) + 3, box = c * 2, ri = Math.max(2, r - 2.4), fo = lowOnly ? 0.3 : 0.92;
+    function shape(d, col) {
+      if (!col) return '<path d="' + d + '" fill="#6a7a8a" fill-opacity="0.05" stroke="#8a96a8" stroke-opacity="0.7"'
+                       + ' stroke-width="0.8" stroke-dasharray="1.5 1.5"/>';
+      return '<path d="' + d + '" fill="' + col + '" fill-opacity="' + fo + '"/>';
+    }
+    let body;
+    if (fills.length === 1) {
+      body = shape('M' + (c - ri) + ' ' + c + 'a' + ri + ' ' + ri + ' 0 1 0 ' + (2 * ri) + ' 0a' + ri + ' ' + ri + ' 0 1 0 ' + (-2 * ri) + ' 0Z', fills[0]);
+    } else {
+      /* A 1.2 px gap between the halves keeps them apart at any size. */
+      const g = 0.6, top = c - ri, bot = c + ri;
+      body = shape('M' + (c - g) + ' ' + top + 'A' + ri + ' ' + ri + ' 0 0 0 ' + (c - g) + ' ' + bot + 'Z', fills[0])
+           + shape('M' + (c + g) + ' ' + top + 'A' + ri + ' ' + ri + ' 0 0 1 ' + (c + g) + ' ' + bot + 'Z', fills[1]);
+    }
+    /* The ring also carries the clicks for the whole disc (transparent fill). */
+    body += '<circle cx="' + c + '" cy="' + c + '" r="' + r + '" fill="#000" fill-opacity="0.001" stroke="' + ring + '"'
+          + (lowOnly ? ' stroke-width="1.5" stroke-dasharray="3 3"' : ' stroke-width="2.5"') + '/>';
+    return '<svg width="' + box + '" height="' + box + '" viewBox="0 0 ' + box + ' ' + box + '"'
+         + (lowOnly ? ' opacity="0.6"' : '') + '>' + body + '</svg>';
+  }
+
   function renderStationsMap(heard, all, rx, showUnheard) {
     const L = window.L;
     const wrap = document.getElementById('stn-map-wrap');
@@ -3453,6 +3556,7 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
     if (!_stnMap) {
       _stnMap = L.map('stn-map', { worldCopyJump: true, minZoom: 2, zoomSnap: 0.5 });
       mapTileLayer(L).addTo(_stnMap);
+      syncSeamarks();
       _stnLayers = L.layerGroup().addTo(_stnMap);
       /* "Show in history" links inside popups. */
       document.getElementById('stn-map').addEventListener('click', function(ev) {
@@ -3497,35 +3601,63 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
      * Such sites are drawn faint and dashed, and the initial view is
      * framed on the sites with at least one Medium+ message, plus the
      * receiver.  Their table rows are dimmed the same way. */
+    /* Which of the two MF frequencies each site transmits on, heard or
+     * not, so a site that sends on both shows a half for each. */
+    const siteFreqs = new Map();
+    all.concat(heard).forEach(function(s) {
+      if (typeof s.lat !== 'number' || typeof s.lon !== 'number') return;
+      const f = Number(s.freq_khz);
+      if (f !== 518 && f !== 490) return;
+      const k = siteKey(s);
+      if (!siteFreqs.has(k)) siteFreqs.set(k, new Set());
+      siteFreqs.get(k).add(f);
+    });
     const bounds = [], lowBounds = [];
     sites.forEach(function(site, k) {
       site.list.sort(function(a, b) { return b.heard.count - a.heard.count; });
       const s0 = site.list[0];
       const lowOnly = !site.list.some(stationTrusted);
       const r = 5 + 3.3 * Math.log10(Math.max(1, site.count));
-      const col = recencyColour(site.last);
-      const mk = L.circleMarker([s0.lat, s0.lon], lowOnly
-          ? { radius: r, color: col, weight: 1, opacity: 0.45, dashArray: '3 3', fillColor: col, fillOpacity: 0.08 }
-          : { radius: r, color: col, weight: 1.5, opacity: 0.95, fillColor: col, fillOpacity: 0.35 })
-        .bindPopup(stationPopupHtml(site), { maxWidth: 280 });
+      /* Per frequency: when it was last heard ('' = never). */
+      const byFreq = {};
+      site.list.forEach(function(s) {
+        const f = Number(s.freq_khz);
+        const b = byFreq[f] || (byFreq[f] = { last: '', letters: [] });
+        if ((s.heard.last_utc || '') > b.last) b.last = s.heard.last_utc;
+        if (b.letters.indexOf(s.letter) < 0) b.letters.push(s.letter);
+      });
+      const fs = siteFreqs.get(k);
+      const split = !!(fs && fs.has(518) && fs.has(490));
+      const fills = split
+        ? [byFreq[518] ? FREQ_COL[518] : null, byFreq[490] ? FREQ_COL[490] : null]
+        : [FREQ_COL[Number(s0.freq_khz)] || '#a0b0c0'];
+      const box = (Math.ceil(r) + 3) * 2;
+      const mk = L.marker([s0.lat, s0.lon], {
+        icon: L.divIcon({ className: 'stn-mk', html: siteMarkerSvg(r, fills, recencyColour(site.last), lowOnly),
+                          iconSize: [box, box], iconAnchor: [box / 2, box / 2] }),
+        keyboard: false, zIndexOffset: lowOnly ? -500 : 0
+      }).bindPopup(stationPopupHtml(site), { maxWidth: 280 });
+      /* "518 E K · 490 I": each frequency with the letters heard on it. */
+      const freqTxt = Object.keys(byFreq).sort(function(a, b) { return b - a; }).map(function(f) {
+        return f + ' ' + byFreq[f].letters.sort().join(' ');
+      }).join(' · ');
       if (_stnShow.labels) {
-        /* "Niton · E I K · 195 km · Forecast": the site's name, every
-         * letter heard from it, how far away it is, and what it sent last. */
-        const letters = Array.from(new Set(site.list.map(function(s) { return s.letter; }))).sort();
+        /* "Niton · 518 E K · 490 I · 195 km · Forecast": the site's name,
+         * every letter heard from it, how far away it is, and what it sent last. */
         const far = typeof s0.dist_km === 'number' && s0.dist_km >= 0 ? ' · ' + fmtKm(s0.dist_km) : '';
         let newest = null;
         site.list.forEach(function(s) { if (!newest || (s.heard.last_utc || '') > (newest.heard.last_utc || '')) newest = s; });
         const typ = newest && newest.heard.last_subject ? SUBJECT_SHORT[newest.heard.last_subject] : '';
-        mk.bindTooltip(escHtml(s0.name) + '<span class="lbl-meta"> · ' + escHtml(letters.join(' ')) + far + '</span>'
+        mk.bindTooltip(escHtml(s0.name) + '<span class="lbl-meta"> · ' + escHtml(freqTxt) + far + '</span>'
                        + (typ ? '<span class="lbl-type"> · ' + escHtml(typ) + '</span>' : ''),
                        { permanent: true, direction: 'right', offset: [r + 2, 0],
                          className: 'stn-lbl' + (lowOnly ? ' low' : '') });
       } else {
-        mk.bindTooltip(escHtml(s0.name) + ' · ' + fmtInt(site.count) + (lowOnly ? ' · low confidence only' : ''),
+        mk.bindTooltip(escHtml(s0.name) + ' · ' + escHtml(freqTxt) + ' · ' + fmtInt(site.count)
+                       + (lowOnly ? ' · low confidence only' : ''),
                        { direction: 'top', offset: [0, -r] });
       }
       mk.addTo(_stnLayers);
-      if (lowOnly) mk.bringToBack();
       mk._lblRank = (lowOnly ? 0 : 2e9) + site.count;
       _stnMarkers[k] = mk;
       (lowOnly ? lowBounds : bounds).push([s0.lat, s0.lon]);
@@ -3613,9 +3745,9 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
       let at = w.pos[0];
       const area = w.pos.length >= 3 && w.kind !== 'cable';
       if (w.pos.length >= 2) {
-        const style = { color: '#ffb74d', weight: 1.2, opacity: 0.65, dashArray: '4 3', interactive: false };
+        const style = { color: '#f08c2e', weight: 1.2, opacity: 0.65, dashArray: '4 3', interactive: false };
         if (area) {
-          L.polygon(w.pos, Object.assign({ fillColor: '#ffb74d', fillOpacity: 0.06 }, style)).addTo(_stnLayers);
+          L.polygon(w.pos, Object.assign({ fillColor: '#f08c2e', fillOpacity: 0.06 }, style)).addTo(_stnLayers);
           let la = 0, lo = 0;
           w.pos.forEach(function(p) { la += p[0]; lo += p[1]; });
           at = [la / w.pos.length, lo / w.pos.length];
@@ -3631,8 +3763,10 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
     spots.forEach(function(spot) {
       spot.list.sort(function(a, b) { return (b.last_utc || '').localeCompare(a.last_utc || ''); });
       const w0 = spot.list[0], n = spot.list.length;
-      const html = '<div class="wrn-icon k-' + escHtml(w0.kind) + '">' + warnSvg(w0.kind)
-                 + (n > 1 ? '<span class="wrn-n">' + n + '</span>' : '') + '</div>';
+      /* Several warnings at one spot: the diamond gets a stack behind it. */
+      const html = '<div class="wrn-icon k-' + escHtml(w0.kind) + (n > 1 ? ' multi' + (n > 2 ? ' multi3' : '') : '') + '"'
+                 + (n > 1 ? ' title="' + n + ' warnings here"' : '') + '>'
+                 + '<span class="wrn-bg"></span>' + warnSvg(w0.kind) + '</div>';
       let pop = '';
       spot.list.forEach(function(w) {
         const title = w.id + ' · ' + warnKind(w.kind)[0];
@@ -3643,12 +3777,12 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
              + '<span class="pp-link" data-msg="' + escHtml(w.rel) + '" data-title="' + escHtml(title) + '">Open message ›</span></div>';
       });
       const mk = L.marker(spot.at, {
-        icon: L.divIcon({ className: '', html: html, iconSize: [22, 22], iconAnchor: [11, 11] }),
+        icon: L.divIcon({ className: '', html: html, iconSize: [32, 32], iconAnchor: [16, 16] }),
         keyboard: false, zIndexOffset: 200
       }).bindPopup(pop, { maxWidth: 320, maxHeight: 320 });
       if (_stnShow.labels)
-        mk.bindTooltip(escHtml(w0.id) + '<span class="lbl-meta"> · ' + escHtml(warnKind(w0.kind)[0]) + (n > 1 ? ' +' + (n - 1) : '') + '</span>',
-                       { permanent: true, direction: 'right', offset: [13, 0], className: 'stn-lbl wrn-lbl' });
+        mk.bindTooltip(escHtml(w0.id) + '<span class="lbl-meta"> · ' + escHtml(warnKind(w0.kind)[0]) + (n > 1 ? ' ×' + n : '') + '</span>',
+                       { permanent: true, direction: 'right', offset: [18, 0], className: 'stn-lbl wrn-lbl' });
       mk._lblRank = -1;
       mk.addTo(_stnLayers);
       _stnOverlays.push(mk);
@@ -7270,13 +7404,16 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
      * line it requires).  Unset or empty, the page uses OpenStreetMap's
      * standard tiles — see mapTileLayer() in the page script.  Read on
      * every page build rather than cached, so it is simply the process
-     * environment that counts. */
+     * environment that counts.  NAVTEX_MAP_SEAMARKS does the same for the
+     * Stations map's OpenSeaMap sea-mark overlay (see syncSeamarks()). */
     std::string inject = "<script>window._BASE_PATH = " + navtex_js_string(base_path) + ";";
     {
         const char *tiles = getenv("NAVTEX_MAP_TILES");
         const char *attr  = getenv("NAVTEX_MAP_ATTRIBUTION");
         if (tiles && *tiles) inject += "window._MAP_TILES = " + navtex_js_string(tiles) + ";";
         if (attr && *attr)   inject += "window._MAP_ATTRIBUTION = " + navtex_js_string(attr) + ";";
+        const char *marks = getenv("NAVTEX_MAP_SEAMARKS");
+        if (marks && *marks) inject += "window._MAP_SEAMARKS = " + navtex_js_string(marks) + ";";
     }
     inject += "</script>\n";
     const std::string head_close = "</head>";
