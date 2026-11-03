@@ -5056,6 +5056,10 @@ static std::string history_read_file(const std::string &log_dir,
  *   forecasts  the newest forecast for each sea area heard in the last
  *              `fc_hours`, reduced to wind / sea state / visibility
  *              (navtex_parse_forecasts()).
+ *   gales      the newest gale warning (subject B) for each sea area heard
+ *              in the last `fc_hours`, in force or expected
+ *              (navtex_parse_gale_warnings()); an area whose newest word is
+ *              "gale ceased" is left out.
  *
  * The parse of each message is cached by its log path, so a file is read once;
  * the cache keeps only what the last request used, so purged files drop out.
@@ -5067,6 +5071,7 @@ struct MapParse {
     std::vector<NavtexPos>          pos;
     const char                     *kind = "warning";
     std::vector<NavtexAreaForecast> fc;
+    std::vector<NavtexGaleWarning>  gales;
     std::string                     gist;   /* the text, header lines dropped, for the popup title */
 };
 static std::mutex                                                     g_mapparse_mu;
@@ -5083,6 +5088,10 @@ static std::shared_ptr<const MapParse> map_parse(const std::string &log_dir, con
     const std::string text = history_read_file(log_dir, rel);
     if (subject == 'E') {
         mp->fc = navtex_parse_forecasts(text);
+    } else if (subject == 'B') {
+        mp->gales = navtex_parse_gale_warnings(text);
+        /* KNMI sends its full Dutch EEZ forecast under B as well. */
+        if (text.find("FORECAST DUTCH EEZ") != std::string::npos) mp->fc = navtex_parse_forecasts(text);
     } else {
         mp->pos  = navtex_parse_positions(text);
         mp->kind = navtex_warning_kind(text, subject);
@@ -5135,7 +5144,7 @@ static std::string mapdata_json(const std::string &log_dir, int hours, int fc_ho
         for (const auto &kv : g_index) {
             const HistoryIndexEntry &e = kv.second;
             const char s = e.q.b2;
-            const bool warn = (s == 'A' || s == 'D' || s == 'L'), fc = (s == 'E');
+            const bool warn = (s == 'A' || s == 'D' || s == 'L'), fc = (s == 'E' || s == 'B');
             if (!(warn && e.q.start_utc >= cut_w) && !(fc && e.q.start_utc >= cut_f)) continue;
             const int st = (e.has_ident && ident_attributed(e.ident)) ? e.ident.r.station : -1;
             cands.push_back({ kv.first, e.q, st });
@@ -5151,13 +5160,17 @@ static std::string mapdata_json(const std::string &log_dir, int hours, int fc_ho
     std::map<std::string, Warn> warns;
     struct Fc { const Cand *c; NavtexAreaForecast f; };
     std::map<std::string, Fc> fcs;
+    struct Gale { const Cand *c; NavtexGaleWarning g; };
+    std::map<std::string, Gale> gales;
     std::unordered_map<std::string, std::shared_ptr<const MapParse>> used;
 
     for (const Cand &c : cands) {
         auto mp = map_parse(log_dir, c.rel, c.q.b2);
         used[c.rel] = mp;
-        if (c.q.b2 == 'E') {
+        if (c.q.b2 == 'E' || c.q.b2 == 'B') {
             for (const auto &f : mp->fc) fcs[NAVTEX_SEA_AREAS[f.area].label] = { &c, f };
+            /* Newest per area, so a later "ceased" clears an earlier warning. */
+            for (const auto &g : mp->gales) gales[NAVTEX_SEA_AREAS[g.area].label] = { &c, g };
             continue;
         }
         /* Keep positions plausibly near the sender. */
@@ -5236,9 +5249,34 @@ static std::string mapdata_json(const std::string &log_dir, int hours, int fc_ho
         j += ",\"force_min\":" + std::to_string(f.force_min) + ",\"force_max\":" + std::to_string(f.force_max);
         j += ",\"force_peak\":" + std::to_string(f.force_peak);
         j += ",\"sea\":" + jstr(navtex_sea_state_name(f.sea_max));
+        /* Wave height in metres (KNMI, DWD), -1 unknown; upto: "up to max". */
+        j += ",\"wave_min\":" + mqtt_fmt_double(f.wave_min, 1) + ",\"wave_max\":" + mqtt_fmt_double(f.wave_max, 1);
+        j += ",\"wave_upto\":" + std::string(f.wave_upto ? "true" : "false");
         j += ",\"vis\":" + std::to_string(f.vis_worst);
         j += ",\"fog\":" + std::string(f.fog ? "true" : "false");
         j += ",\"body\":" + jstr(mqtt_sanitise_text(f.body));
+        j += ",\"utc\":" + jstr(map_iso(c.q.start_utc));
+        j += ",\"station\":" + (c.station >= 0 ? jstr(NAVTEX_STATIONS[c.station].name) : std::string("null"));
+        j += ",\"rel\":" + jstr(c.rel);
+        j += "}";
+    }
+    j += "],\"gales\":[";
+    first = true;
+    for (const auto &kv : gales) {
+        const NavtexGaleWarning &g = kv.second.g;
+        /* Ceased, or below gale force (KNMI's wind warnings start at 7). */
+        if (g.status == 'C' || g.force < 8) continue;
+        const Cand &c = *kv.second.c;
+        const NavtexSeaArea &a = NAVTEX_SEA_AREAS[g.area];
+        if (!first) j += ",";
+        first = false;
+        j += "{\"area\":" + jstr(a.label);
+        j += ",\"inshore\":" + std::string(a.inshore ? "true" : "false");
+        j += ",\"lat\":" + mqtt_fmt_double(a.lat, 3) + ",\"lon\":" + mqtt_fmt_double(a.lon, 3);
+        j += ",\"status\":" + jstr(g.status == 'E' ? "expected" : "in_force");
+        j += ",\"force\":" + std::to_string(g.force) + ",\"force_now\":" + std::to_string(g.force_now);
+        j += ",\"wind_dir\":" + jstr(g.wind_dir);
+        j += ",\"text\":" + jstr(mqtt_sanitise_text(g.text));
         j += ",\"utc\":" + jstr(map_iso(c.q.start_utc));
         j += ",\"station\":" + (c.station >= 0 ? jstr(NAVTEX_STATIONS[c.station].name) : std::string("null"));
         j += ",\"rel\":" + jstr(c.rel);

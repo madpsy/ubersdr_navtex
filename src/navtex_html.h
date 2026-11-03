@@ -1182,14 +1182,29 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
 }
 .stn-map-wrap[hidden] { display: none; }
 #stn-map { position: absolute; inset: 0; background: #0d0d1a; }
+/* Legend: a compact key in the map's corner.  The header folds it away
+ * (remembered); only the header takes clicks, so the map stays draggable. */
 .stn-legend {
-  position: absolute; left: 10px; bottom: 22px; z-index: 500;
-  background: rgba(13,27,42,0.88); border: 1px solid #1a3a5c; border-radius: 5px;
-  padding: 6px 9px; font-size: 0.66rem; color: #a0b8d8;
-  display: flex; flex-direction: column; gap: 3px; pointer-events: none;
+  position: absolute; left: 10px; bottom: 24px; z-index: 500;
+  background: rgba(10,16,26,0.9); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.45); backdrop-filter: blur(3px);
+  padding: 0; font: 500 10.5px/1.25 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  color: #a9bacd; pointer-events: none; min-width: 150px;
 }
-.stn-legend span { display: flex; align-items: center; gap: 6px; }
-.stn-legend i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; border: 1px solid rgba(255,255,255,0.35); }
+.stn-legend .lg-head {
+  pointer-events: auto; cursor: pointer; user-select: none;
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 6px 9px; font-size: 9.5px; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase; color: #7f93ab;
+}
+.stn-legend .lg-head::after { content: '\25BE'; font-size: 10px; transition: transform .15s; }
+.stn-legend.folded .lg-head::after { transform: rotate(-90deg); }
+.stn-legend.folded .lg-body { display: none; }
+.stn-legend .lg-body { padding: 0 9px 7px; display: grid; grid-template-columns: auto auto; gap: 3px 14px; }
+.stn-legend .lg-col { display: flex; flex-direction: column; gap: 3px; }
+.stn-legend .lg-col > b { font-size: 9px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #5f7590; margin: 2px 0 1px; }
+.stn-legend span { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+.stn-legend span[hidden] { display: none; }
+.stn-legend i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; flex-shrink: 0; border: 1px solid rgba(255,255,255,0.3); }
 .stn-legend .lg-rx { background: #e94560; border-color: #fff; }
 .stn-table-wrap { overflow-x: auto; flex-shrink: 0; }
 .stn-table thead th.sortable { cursor: pointer; user-select: none; }
@@ -1211,12 +1226,15 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
 .rec-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 6px; vertical-align: 0; }
 
 /* Leaflet, recoloured to the page's dark theme. */
-.leaflet-container { background: #0d0d1a; font-family: 'Courier New', Courier, monospace; }
+/* Map overlays use the system sans-serif with tabular figures: the page's
+ * monospace reads as a terminal, not a chart. */
+.leaflet-container { background: #0d0d1a; font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; font-variant-numeric: tabular-nums; }
 .leaflet-popup-content-wrapper, .leaflet-popup-tip {
-  background: #0d1b2a; color: #c8dff0; border: 1px solid #2a4a7f;
-  box-shadow: 0 6px 24px rgba(0,0,0,0.6);
+  background: #0c1520; color: #d3e0ee; border: 1px solid rgba(255,255,255,0.1);
+  box-shadow: 0 8px 28px rgba(0,0,0,0.6);
 }
-.leaflet-popup-content { margin: 10px 12px; font-size: 0.76rem; line-height: 1.45; }
+.leaflet-popup-content-wrapper { border-radius: 6px; }
+.leaflet-popup-content { margin: 11px 13px; font-size: 12px; line-height: 1.45; }
 .leaflet-container a.leaflet-popup-close-button { color: #7d8aa3; }
 .leaflet-container a.leaflet-popup-close-button:hover { color: #e94560; }
 .leaflet-control-attribution {
@@ -1224,29 +1242,42 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
 }
 .leaflet-control-attribution a { color: #7ab8d8 !important; }
 .leaflet-bar a, .leaflet-bar a:hover {
-  background: #16213e; color: #a0b8d8; border-bottom-color: #2a4a7f;
+  background: rgba(10,16,26,0.92); color: #a9bacd; border-bottom-color: rgba(255,255,255,0.08);
+  font: 400 17px/26px system-ui, sans-serif; width: 28px; height: 28px;
 }
-.leaflet-bar a:hover { color: #53d8fb; }
-.leaflet-bar { border: 1px solid #2a4a7f !important; }
+.leaflet-bar a:hover { color: #fff; background: rgba(22,34,52,0.95); }
+.leaflet-bar { border: 1px solid rgba(255,255,255,0.1) !important; border-radius: 6px !important; overflow: hidden;
+               box-shadow: 0 4px 14px rgba(0,0,0,0.45) !important; }
+/* Scale bar and cursor position: chart furniture, bottom right. */
+.leaflet-control-scale-line {
+  background: rgba(10,16,26,0.75); color: #a9bacd; border-color: #7f93ab; font-size: 10px; line-height: 1.3;
+}
+.stn-coord {
+  background: rgba(10,16,26,0.82); color: #a9bacd; padding: 2px 7px; border-radius: 4px;
+  font: 500 10.5px/1.5 ui-monospace, 'SF Mono', Menlo, Consolas, monospace; letter-spacing: 0.02em;
+  border: 1px solid rgba(255,255,255,0.08); min-width: 150px; text-align: center;
+}
+.stn-coord:empty { display: none; }
 .leaflet-tooltip {
-  background: #0d1b2a; color: #c8dff0; border: 1px solid #2a4a7f; font-size: 0.7rem;
-  box-shadow: none; font-family: 'Courier New', monospace;
+  background: #0c1520; color: #d3e0ee; border: 1px solid rgba(255,255,255,0.12); font-size: 11px;
+  box-shadow: 0 3px 10px rgba(0,0,0,0.5); font-family: inherit; border-radius: 4px;
 }
 .leaflet-tooltip-top::before { border-top-color: #2a4a7f; }
 /* Permanent station-name labels (Stations tab "Labels" toggle): text with
  * a dark halo straight on the map rather than a boxed tooltip, so dozens
  * of them stay readable without walling off the coastline beneath. */
 .leaflet-tooltip.stn-lbl {
-  background: transparent; border: 0; box-shadow: none; padding: 0 0 0 2px;
-  color: #dbe8f5; font-size: 0.7rem; letter-spacing: 0.3px; white-space: nowrap;
-  text-shadow: 0 0 3px #0d0d1a, 0 0 3px #0d0d1a, 1px 1px 2px #000;
+  background: transparent; border: 0; box-shadow: none; padding: 0 0 0 1px; border-radius: 0;
+  color: #eef3f8; font-size: 11.5px; font-weight: 600; letter-spacing: 0.01em; white-space: nowrap; line-height: 1.2;
+  text-shadow: 0 0 2px #06090f, 0 0 3px #06090f, 0 0 6px rgba(6,9,15,0.9);
 }
 .leaflet-tooltip.stn-lbl::before { display: none; }
-.leaflet-tooltip.stn-lbl .lbl-meta { color: #7d9ab8; }
+.leaflet-tooltip.stn-lbl .lbl-meta { color: #9db0c6; font-weight: 500; }
+.leaflet-tooltip.stn-lbl div.lbl-meta { font-size: 10px; margin-top: 1px; }
 .leaflet-tooltip.stn-lbl.low { opacity: 0.5; }
-.leaflet-tooltip.stn-lbl .lbl-type { color: #b39ddb; }
-.leaflet-tooltip.stn-lbl.wrn-lbl { font-size: 0.64rem; color: #fdf3e1; }
-.leaflet-tooltip.stn-lbl.wrn-lbl .lbl-meta { color: #e0a874; }
+.leaflet-tooltip.stn-lbl .lbl-type { color: #c3b4e6; }
+.leaflet-tooltip.stn-lbl.wrn-lbl { font-size: 10px; font-weight: 600; color: #f3e9d8; }
+.leaflet-tooltip.stn-lbl.wrn-lbl .lbl-meta { color: #d9a877; }
 /* Station markers are SVG in a divIcon: only the drawn halves take clicks. */
 .stn-mk { pointer-events: none !important; }
 .stn-mk svg { display: block; overflow: visible; }
@@ -1256,62 +1287,93 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
  * stack of diamonds; the label says how many. */
 .wrn-icon {
   --wk: #f08c2e;
-  width: 32px; height: 32px; position: relative; color: #1a2433;
-  display: flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; position: relative; color: #182230;
+  display: flex; align-items: center; justify-content: center; cursor: pointer;
 }
 .wrn-icon .wrn-bg, .wrn-icon.multi::before, .wrn-icon.multi3::after {
-  content: ''; position: absolute; left: 4px; top: 4px; width: 24px; height: 24px; box-sizing: border-box;
-  transform: rotate(45deg); border-radius: 3px;
-  background: #fdf3e1; border: 2px solid var(--wk);
-  box-shadow: 0 1px 4px rgba(0,0,0,0.6);
+  content: ''; position: absolute; left: 4px; top: 4px; width: 18px; height: 18px; box-sizing: border-box;
+  transform: rotate(45deg); border-radius: 2.5px;
+  background: #fbf3e4; border: 1.5px solid var(--wk);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.55);
 }
-.wrn-icon.multi::before  { transform: translate(4px, -4px) rotate(45deg); background: #c9bda8; }
-.wrn-icon.multi3::after  { transform: translate(8px, -8px) rotate(45deg); background: #9c927f; z-index: -1; }
+.wrn-icon.multi::before  { transform: translate(3px, -3px) rotate(45deg); background: #cfc3ae; }
+.wrn-icon.multi3::after  { transform: translate(6px, -6px) rotate(45deg); background: #a59a87; z-index: -1; }
 .wrn-icon.multi::before  { z-index: 0; }
 .wrn-icon .wrn-bg { z-index: 1; }
-.wrn-icon svg { width: 18px; height: 18px; display: block; position: relative; z-index: 2; stroke-width: 1.5; }
+.wrn-icon svg { width: 14px; height: 14px; display: block; position: relative; z-index: 2; stroke-width: 1.6; }
 .wrn-icon.k-sar      { --wk: #e94560; }
 .wrn-icon.k-military { --wk: #d9480f; }
 .wrn-icon.k-warning  { --wk: #8aa4c4; }
-/* Sea-area forecast badges, centred on the area's anchor point: one line,
- * the area's name in a tinted tab and the opening conditions beside it.
- * The tab's colour is the severity: sea green, amber for gale, red for
- * storm.  Inshore waters have a lighter body. */
+/* Nearby warnings, grouped until the map is zoomed in far enough to part
+ * them: a disc with the count, ringed in the colour of the most pressing
+ * kind among them.  A click zooms to the group. */
+.wrn-clu {
+  --wk: #f08c2e;
+  width: 100%; height: 100%; box-sizing: border-box; border-radius: 50%; cursor: pointer;
+  background: rgba(12,18,28,0.9); border: 2px solid var(--wk);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--wk) 22%, transparent), 0 2px 6px rgba(0,0,0,0.5);
+  color: #f6efe3; font: 700 11px/1 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  display: flex; align-items: center; justify-content: center; font-variant-numeric: tabular-nums;
+}
+.wrn-clu:hover { background: rgba(26,38,56,0.95); }
+.wrn-clu.k-sar      { --wk: #e94560; }
+.wrn-clu.k-military { --wk: #d9480f; }
+.wrn-clu.k-warning  { --wk: #8aa4c4; }
+/* Sea-area forecast cards, centred on the area's anchor point.  Two short
+ * lines: the area, then the wind (an arrow flying with it, the direction
+ * and Beaufort forces) and the sea state.  The bar down the left is the
+ * severity (sea green, amber for gale, red for storm); a chip gives the
+ * worst force forecast for the period when that reaches gale. */
 .fc-box {
-  --fs: #3fa892;
+  --fs: #3fb39b;
   position: absolute; left: 0; top: 0; transform: translate(-50%, -50%);
-  display: flex; align-items: stretch; white-space: nowrap; cursor: pointer;
-  background: rgba(16,20,28,0.94); border-radius: 10px; overflow: hidden;
-  box-shadow: 0 0 0 1px rgba(255,255,255,0.08), 0 2px 6px rgba(0,0,0,0.55);
-  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; line-height: 1;
+  white-space: nowrap; cursor: pointer; text-align: left;
+  background: rgba(10,16,26,0.9); border-radius: 4px; padding: 3px 7px 3px 9px;
+  box-shadow: inset 3px 0 0 var(--fs), 0 0 0 1px rgba(255,255,255,0.07), 0 2px 8px rgba(0,0,0,0.5);
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; font-variant-numeric: tabular-nums;
 }
+.fc-box:hover { background: rgba(20,30,46,0.95); }
+.fc-box .fc-l1 { display: flex; align-items: center; gap: 6px; line-height: 13px; }
 .fc-box .fc-area {
-  background: var(--fs); color: #0d141c; padding: 4px 6px 4px 8px;
-  font-size: 0.56rem; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase;
-  display: flex; align-items: center;
+  font-size: 9px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #93a8bf;
+  max-width: 150px; overflow: hidden; text-overflow: ellipsis;
 }
-.fc-box .fc-sum  { color: #e6eef6; padding: 4px 9px 4px 7px; font-size: 0.66rem; font-weight: 600; display: flex; align-items: center; }
-.fc-box.gale  { --fs: #ffc94d; }
-.fc-box.storm { --fs: #ff5a6e; }
-.fc-box.storm .fc-sum { color: #ffd0d6; }
-.fc-box.inshore { background: rgba(30,40,52,0.94); }
-.fc-box.inshore .fc-area { font-style: italic; }
+.fc-box .fc-pk {
+  margin-left: auto; font-size: 9px; font-weight: 800; line-height: 11px; padding: 0 3px; border-radius: 2px;
+  background: var(--fs); color: #10161f;
+}
+.fc-box .fc-l2 { display: flex; align-items: center; gap: 5px; line-height: 15px; color: #eef3f8; font-size: 11px; font-weight: 600; }
+.fc-box .fc-l2 svg { width: 11px; height: 11px; flex-shrink: 0; color: #cfe0f0; }
+.fc-box .fc-sea { color: #a9bccf; font-weight: 500; }
+.fc-box .fc-vis { color: #d2b48a; font-weight: 500; font-size: 10px; }
+/* A gale warning for the area: a ring in the severity colour (dashed while
+ * only expected) and a warning triangle before the name. */
+.fc-box.gw { outline: 1px solid var(--fs); outline-offset: 0; }
+.fc-box.gw.gw-exp { outline-style: dashed; }
+.fc-box .fc-gw { width: 10px; height: 10px; flex-shrink: 0; color: var(--fs); margin-right: -2px; }
+.fc-box.gale  { --fs: #f2b33d; }
+.fc-box.storm { --fs: #ef5466; }
+.fc-box.inshore .fc-area { color: #7fa3b8; }
+/* Older than a day: the severity stays, muted; the text dims. */
+.fc-box.stale { box-shadow: inset 3px 0 0 color-mix(in srgb, var(--fs) 55%, #3a4452), 0 0 0 1px rgba(255,255,255,0.05), 0 2px 8px rgba(0,0,0,0.5); }
+.fc-box.stale .fc-pk { background: color-mix(in srgb, var(--fs) 60%, #3a4452); }
+.fc-box.stale .fc-l2, .fc-box.stale .fc-l2 svg { color: #8f9fb2; }
+.fc-box.stale .fc-sea, .fc-box.stale .fc-area { color: #6f8095; }
 /* Zoomed out (a continent in view) there is no room for words: warnings
- * shrink to dots and the forecast boxes wait until the map is zoomed in.
+ * shrink to dots and the forecast cards wait until the map is zoomed in.
  * Warning labels need a little more room still. */
-.z-far .wrn-icon { transform: scale(0.4); }
-.z-far .wrn-icon .wrn-bg { background: var(--wk); border-color: #fdf3e1; border-width: 1.5px; }
+.z-far .wrn-icon { transform: scale(0.45); }
+.z-far .wrn-icon .wrn-bg { background: var(--wk); border-color: #fbf3e4; border-width: 1.5px; }
 .z-far .wrn-icon svg, .z-far .wrn-icon::before, .z-far .wrn-icon::after { display: none; }
 .z-far .fc-box { display: none; }
+/* A warning's drawn line or area only means something close up. */
+.z-far .wrn-geo { display: none; }
+.z-far .wrn-clu { transform: scale(0.8); opacity: 0.85; box-shadow: 0 1px 4px rgba(0,0,0,0.5); }
 .z-far .wrn-lbl, .z-mid .wrn-lbl { display: none; }
 .stn-legend .lg-hint { color: #7d8aa3; font-style: italic; }
 .stn-legend .lg-hint[hidden] { display: none; }
-/* Older than a day: dimmed, but still opaque so nothing shows through. */
-/* Older than a day: the tab greys out, the text dims. */
-.fc-box.stale .fc-area { background: color-mix(in srgb, var(--fs) 35%, #5a6573); }
-.fc-box.stale .fc-sum, .fc-box.stale.storm .fc-sum { color: #8a9ab0; }
-.pp-gist { color: #a0b8d8; font-size: 0.7rem; margin: 4px 0 2px; white-space: normal; }
-.pp-body { color: #c8dff0; font-size: 0.7rem; margin: 6px 0 2px; white-space: normal; }
+.pp-gist { color: #a9bccf; font-size: 11.5px; margin: 4px 0 2px; white-space: normal; }
+.pp-body { color: #c9d7e6; font-size: 11.5px; margin: 6px 0 2px; white-space: normal; }
 .pp-wrn + .pp-wrn { border-top: 1px solid #1a3a5c; margin-top: 6px; padding-top: 6px; }
 .stn-legend .lg-wrn { width: 7px; height: 7px; margin: 0 1px; border-radius: 1px; transform: rotate(45deg);
                       background: #fdf3e1; border: 1.5px solid #f08c2e; }
@@ -1321,15 +1383,17 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
 .stn-legend .lg-half-n { background: linear-gradient(90deg, #ffb68f 0 45%, transparent 45%); border-style: dashed; }
 .stn-legend .lg-ring { background: transparent; border-width: 2px; border-style: solid; width: 7px; height: 7px; }
 .stn-legend .lg-sub { color: #7d8aa3; margin-top: 2px; }
-.stn-legend .lg-fc  { border-radius: 4px; width: 14px; height: 8px; border: 0;
-                      background: linear-gradient(90deg, #3fa892 0 40%, rgba(16,20,28,0.94) 40%);
-                      box-shadow: 0 0 0 1px rgba(255,255,255,0.25); }
-.pp-title { display: flex; align-items: center; gap: 7px; font-weight: 600; font-size: 0.82rem; margin-bottom: 2px; }
-.pp-sub   { color: #6a8aaa; font-size: 0.7rem; margin-bottom: 6px; }
+.stn-legend .lg-fc  { border-radius: 2px; width: 13px; height: 9px; border: 0; background: rgba(10,16,26,0.9);
+                      box-shadow: inset 2px 0 0 var(--fs, #3fb39b), 0 0 0 1px rgba(255,255,255,0.3); }
+.stn-legend .lg-gw  { width: 10px; height: 10px; border: 0; border-radius: 0; color: #f2b33d; }
+.stn-legend .lg-clu { width: 11px; height: 11px; background: rgba(12,18,28,0.9); border: 1.5px solid #f08c2e;
+                      font: 700 7px/11px system-ui, sans-serif; color: #fff; text-align: center; font-style: normal; }
+.pp-title { display: flex; align-items: center; gap: 7px; font-weight: 650; font-size: 13px; margin-bottom: 2px; color: #f1f5f9; }
+.pp-sub   { color: #7f93ab; font-size: 11px; margin-bottom: 6px; }
 .pp-st    { border-top: 1px solid #1a3a5c; padding-top: 5px; margin-top: 5px; }
 .pp-grid  { display: grid; grid-template-columns: auto 1fr; gap: 1px 10px; }
-.pp-grid b { color: #7d8aa3; font-weight: normal; font-size: 0.64rem; text-transform: uppercase; letter-spacing: 0.5px; }
-.pp-link  { color: #53d8fb; cursor: pointer; text-decoration: underline; font-size: 0.7rem; margin-top: 4px; display: inline-block; }
+.pp-grid b { color: #7f93ab; font-weight: 600; font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.06em; align-self: center; }
+.pp-link  { color: #53d8fb; cursor: pointer; text-decoration: none; font-size: 11.5px; font-weight: 600; margin-top: 4px; display: inline-block; }
 .rx-icon {
   width: 14px; height: 14px; border-radius: 50%; background: #e94560;
   border: 2px solid #fff; box-shadow: 0 0 0 4px rgba(233,69,96,0.3), 0 0 10px #e94560;
@@ -1530,7 +1594,9 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
  * one surface inverts those gaps too, into a bright grid across the map;
  * filtering each tile leaves the gaps showing the map's own dark
  * background, where they all but disappear. */
-.map-tiles-dark .leaflet-tile { filter: invert(1) hue-rotate(180deg) brightness(.85) contrast(.9); }
+/* Inverted, then mostly desaturated: a quiet slate chart in which roads and
+ * land use recede and the coastline, names and overlays carry the eye. */
+.map-tiles-dark .leaflet-tile { filter: invert(1) hue-rotate(180deg) saturate(.28) brightness(.78) contrast(1.08); }
 .mx-polar { max-width: 400px; margin: 0 auto; }
 .mx-scatter { position: relative; }
 .mx-scatter canvas { display: block; width: 100%; }
@@ -1841,19 +1907,32 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
     <div class="stn-map-wrap" id="stn-map-wrap">
       <div id="stn-map"></div>
       <div class="stn-legend" id="stn-legend">
-        <span><i class="lg-f518"></i>518 kHz</span>
-        <span><i class="lg-f490"></i>490 kHz</span>
-        <span><i class="lg-half"></i>Both (518 left, 490 right)</span>
-        <span><i class="lg-half-n"></i>Empty half: not heard on that one</span>
-        <span class="lg-sub">Ring: last heard on either</span>
-        <span><i class="lg-ring" style="border-color:#4caf50"></i>Last hour</span>
-        <span><i class="lg-ring" style="border-color:#53d8fb"></i>Last 24 hours</span>
-        <span><i class="lg-ring" style="border-color:#ffc107"></i>Last 7 days</span>
-        <span><i class="lg-ring" style="border-color:#6a7a8a"></i>Older</span>
-        <span><i class="lg-rx"></i>Receiver</span>
-        <span id="lg-wrn" hidden><i class="lg-wrn"></i>Warning</span>
-        <span id="lg-fc" hidden><i class="lg-fc"></i>Sea area forecast</span>
-        <span id="lg-hint" class="lg-hint" hidden>Zoom in for forecasts and warning details</span>
+        <div class="lg-head" id="lg-head" title="Show or hide the key">Key</div>
+        <div class="lg-body">
+          <div class="lg-col">
+            <b>Station</b>
+            <span><i class="lg-f518"></i>518 kHz</span>
+            <span><i class="lg-f490"></i>490 kHz</span>
+            <span><i class="lg-half"></i>Both (518 | 490)</span>
+            <span><i class="lg-half-n"></i>Not heard on one</span>
+            <span><i class="lg-rx"></i>Receiver</span>
+            <span id="lg-wrn" hidden><i class="lg-wrn"></i>Warning</span>
+            <span id="lg-clu" hidden><i class="lg-clu">3</i>Warnings, grouped</span>
+          </div>
+          <div class="lg-col">
+            <b>Last heard</b>
+            <span><i class="lg-ring" style="border-color:#4caf50"></i>Last hour</span>
+            <span><i class="lg-ring" style="border-color:#53d8fb"></i>Last 24 h</span>
+            <span><i class="lg-ring" style="border-color:#ffc107"></i>Last 7 days</span>
+            <span><i class="lg-ring" style="border-color:#6a7a8a"></i>Older</span>
+            <b id="lg-fc-h" hidden>Sea state</b>
+            <span id="lg-fc" hidden><i class="lg-fc"></i>Below gale</span>
+            <span id="lg-fc-g" hidden><i class="lg-fc" style="--fs:#f2b33d"></i>Gale 8&ndash;9</span>
+            <span id="lg-fc-s" hidden><i class="lg-fc" style="--fs:#ef5466"></i>Storm 10+</span>
+            <span id="lg-gw" hidden><svg class="lg-gw" viewBox="0 0 12 12"><path d="M6 1l5 9.5H1z" fill="currentColor"/></svg>Gale warning</span>
+          </div>
+          <span id="lg-hint" class="lg-hint" hidden style="grid-column: 1 / -1">Zoom in for forecasts and warning details</span>
+        </div>
       </div>
     </div>
     <div class="stn-table-wrap" id="stn-table-wrap">
@@ -3527,7 +3606,7 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
    * not been heard: left empty, with a faint dashed edge.  The ring
    * around it is in the recency colour of the newest message on either. */
   function siteMarkerSvg(r, fills, ring, lowOnly) {
-    const c = Math.ceil(r) + 3, box = c * 2, ri = Math.max(2, r - 2.4), fo = lowOnly ? 0.3 : 0.92;
+    const c = Math.ceil(r) + 3, box = c * 2, ri = Math.max(2, r - 2.4), fo = lowOnly ? 0.3 : 0.8;
     function shape(d, col) {
       if (!col) return '<path d="' + d + '" fill="#6a7a8a" fill-opacity="0.05" stroke="#8a96a8" stroke-opacity="0.7"'
                        + ' stroke-width="0.8" stroke-dasharray="1.5 1.5"/>';
@@ -3544,7 +3623,7 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
     }
     /* The ring also carries the clicks for the whole disc (transparent fill). */
     body += '<circle cx="' + c + '" cy="' + c + '" r="' + r + '" fill="#000" fill-opacity="0.001" stroke="' + ring + '"'
-          + (lowOnly ? ' stroke-width="1.5" stroke-dasharray="3 3"' : ' stroke-width="2.5"') + '/>';
+          + (lowOnly ? ' stroke-width="1.5" stroke-dasharray="3 3"' : ' stroke-width="2"') + '/>';
     return '<svg width="' + box + '" height="' + box + '" viewBox="0 0 ' + box + ' ' + box + '"'
          + (lowOnly ? ' opacity="0.6"' : '') + '>' + body + '</svg>';
   }
@@ -3565,7 +3644,21 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
         const m = ev.target.closest('[data-msg]');
         if (m) viewMessage(m.getAttribute('data-msg'), m.getAttribute('data-title') || '');
       });
+      _stnMap.on('zoomend', function() { layoutWarnings(); });
       _stnMap.on('zoomend moveend', function() { stnZoomClass(); declutterStnLabels(); });
+      L.control.scale({ position: 'bottomright', imperial: false, maxWidth: 110 }).addTo(_stnMap);
+      /* Cursor position in degrees and decimal minutes, as charts give it. */
+      const Coord = L.Control.extend({ options: { position: 'bottomright' },
+        onAdd: function() { const d = L.DomUtil.create('div', 'stn-coord'); return d; } });
+      const coord = new Coord().addTo(_stnMap).getContainer();
+      _stnMap.on('mousemove', function(e) { coord.textContent = fmtLatLonDM(e.latlng.lat, e.latlng.lng); });
+      _stnMap.on('mouseout', function() { coord.textContent = ''; });
+      const lg = document.getElementById('stn-legend'), lh = document.getElementById('lg-head');
+      try { if (localStorage.getItem('navtex.stn.legend') === '0') lg.classList.add('folded'); } catch (e) { /* private mode */ }
+      lh.addEventListener('click', function() {
+        lg.classList.toggle('folded');
+        try { localStorage.setItem('navtex.stn.legend', lg.classList.contains('folded') ? '0' : '1'); } catch (e) { /* private mode */ }
+      });
     }
     /* The panel may have been hidden when the map was created. */
     _stnMap.invalidateSize();
@@ -3617,7 +3710,9 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
       site.list.sort(function(a, b) { return b.heard.count - a.heard.count; });
       const s0 = site.list[0];
       const lowOnly = !site.list.some(stationTrusted);
-      const r = 5 + 3.3 * Math.log10(Math.max(1, site.count));
+      /* Grows slowly with traffic and stops at 10 px, so a busy site's
+       * marker stays a marker rather than a blob over the coastline. */
+      const r = Math.min(10, 4.5 + 1.8 * Math.log10(Math.max(1, site.count)));
       /* Per frequency: when it was last heard ('' = never). */
       const byFreq = {};
       site.list.forEach(function(s) {
@@ -3642,14 +3737,15 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
         return f + ' ' + byFreq[f].letters.sort().join(' ');
       }).join(' · ');
       if (_stnShow.labels) {
-        /* "Niton · 518 E K · 490 I · 195 km · Forecast": the site's name,
-         * every letter heard from it, how far away it is, and what it sent last. */
+        /* "Niton" over "518 E K · 490 I · 195 km · Forecast": the site's
+         * name, then every letter heard from it, how far away it is, and
+         * what it sent last on a second line beneath. */
         const far = typeof s0.dist_km === 'number' && s0.dist_km >= 0 ? ' · ' + fmtKm(s0.dist_km) : '';
         let newest = null;
         site.list.forEach(function(s) { if (!newest || (s.heard.last_utc || '') > (newest.heard.last_utc || '')) newest = s; });
         const typ = newest && newest.heard.last_subject ? SUBJECT_SHORT[newest.heard.last_subject] : '';
-        mk.bindTooltip(escHtml(s0.name) + '<span class="lbl-meta"> · ' + escHtml(freqTxt) + far + '</span>'
-                       + (typ ? '<span class="lbl-type"> · ' + escHtml(typ) + '</span>' : ''),
+        mk.bindTooltip(escHtml(s0.name) + '<div class="lbl-meta">' + escHtml(freqTxt) + far
+                       + (typ ? '<span class="lbl-type"> · ' + escHtml(typ) + '</span>' : '') + '</div>',
                        { permanent: true, direction: 'right', offset: [r + 2, 0],
                          className: 'stn-lbl' + (lowOnly ? ' low' : '') });
       } else {
@@ -3667,9 +3763,14 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
     _stnOverlays = [];
     renderMapWarnings(L);
     renderMapForecasts(L);
-    const lw = document.getElementById('lg-wrn'), lf = document.getElementById('lg-fc');
+    const lw = document.getElementById('lg-wrn');
     if (lw) lw.hidden = !(_stnShow.warnings && _mapData && _mapData.warnings && _mapData.warnings.length);
-    if (lf) lf.hidden = !(_stnShow.sea && _mapData && _mapData.forecasts && _mapData.forecasts.length);
+    const hasFc = !!(_stnShow.sea && _mapData && _mapData.forecasts && _mapData.forecasts.length);
+    ['lg-fc', 'lg-fc-h', 'lg-fc-g', 'lg-fc-s'].forEach(function(id) { const e = document.getElementById(id); if (e) e.hidden = !hasFc; });
+    const lg = document.getElementById('lg-gw');
+    if (lg) lg.hidden = !(_stnShow.sea && _mapData && _mapData.gales && _mapData.gales.length);
+    const lc = document.getElementById('lg-clu');
+    if (lc) lc.hidden = !(lw && !lw.hidden);
 
     if (rx.valid && typeof rx.lat === 'number' && typeof rx.lon === 'number') {
       L.marker([rx.lat, rx.lon], {
@@ -3711,7 +3812,7 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
   function declutterStnLabels() {
     if (!_stnMap) return;
     const items = [];
-    Object.keys(_stnMarkers).map(function(k) { return _stnMarkers[k]; }).concat(_stnOverlays).forEach(function(mk) {
+    Object.keys(_stnMarkers).map(function(k) { return _stnMarkers[k]; }).concat(_stnOverlays, _wrnMarkers).forEach(function(mk) {
       let el = null;
       if (mk._fcBox) el = mk.getElement && mk.getElement() && mk.getElement().querySelector('.fc-box');
       else {
@@ -3736,18 +3837,38 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
   }
 
   /* Warnings: one marker per spot (several warnings at one position share
-   * it, with a count), the warning's line or area drawn faintly behind. */
+   * it, with a count), the warning's line or area drawn faintly behind.
+   * Spots closer than a marker's width on screen are grouped (see
+   * layoutWarnings), and regrouped at every zoom. */
+  const WRN_COL = { sar: '#e94560', military: '#d9480f', warning: '#8aa4c4' };
+  /* Which kind a group's ring takes: the most pressing among its members. */
+  const WRN_PRIO = { sar: 3, military: 2 };
+  let _wrnSpots = [], _wrnLayer = null, _wrnMarkers = [];
   function renderMapWarnings(L) {
+    _wrnSpots = []; _wrnMarkers = [];
+    _wrnLayer = L.layerGroup().addTo(_stnLayers);
     if (!_stnShow.warnings || !_mapData || !Array.isArray(_mapData.warnings)) return;
-    const spots = new Map();
+    const spots = new Map(), drawn = new Set();
     _mapData.warnings.forEach(function(w) {
       if (!w.pos || !w.pos.length) return;
       let at = w.pos[0];
       const area = w.pos.length >= 3 && w.kind !== 'cable';
-      if (w.pos.length >= 2) {
-        const style = { color: '#f08c2e', weight: 1.2, opacity: 0.65, dashArray: '4 3', interactive: false };
+      /* The same area repeated by several warnings (or one warning heard
+       * from several stations) is drawn once: stacked, the faint fills
+       * add up to a solid block. */
+      const geo = JSON.stringify(w.pos);
+      if (w.pos.length >= 2 && drawn.has(geo)) {
         if (area) {
-          L.polygon(w.pos, Object.assign({ fillColor: '#f08c2e', fillOpacity: 0.06 }, style)).addTo(_stnLayers);
+          let la = 0, lo = 0;
+          w.pos.forEach(function(p) { la += p[0]; lo += p[1]; });
+          at = [la / w.pos.length, lo / w.pos.length];
+        }
+      } else if (w.pos.length >= 2) {
+        drawn.add(geo);
+        const col = WRN_COL[w.kind] || '#f08c2e';
+        const style = { color: col, weight: 1, opacity: 0.55, dashArray: '3 3', interactive: false, className: 'wrn-geo' };
+        if (area) {
+          L.polygon(w.pos, Object.assign({ fillColor: col, fillOpacity: 0.05 }, style)).addTo(_stnLayers);
           let la = 0, lo = 0;
           w.pos.forEach(function(p) { la += p[0]; lo += p[1]; });
           at = [la / w.pos.length, lo / w.pos.length];
@@ -3762,52 +3883,192 @@ header h1 { font-size: 1.05rem; color: #e94560; letter-spacing: 2px; text-transf
     });
     spots.forEach(function(spot) {
       spot.list.sort(function(a, b) { return (b.last_utc || '').localeCompare(a.last_utc || ''); });
-      const w0 = spot.list[0], n = spot.list.length;
-      /* Several warnings at one spot: the diamond gets a stack behind it. */
-      const html = '<div class="wrn-icon k-' + escHtml(w0.kind) + (n > 1 ? ' multi' + (n > 2 ? ' multi3' : '') : '') + '"'
-                 + (n > 1 ? ' title="' + n + ' warnings here"' : '') + '>'
-                 + '<span class="wrn-bg"></span>' + warnSvg(w0.kind) + '</div>';
-      let pop = '';
-      spot.list.forEach(function(w) {
-        const title = w.id + ' · ' + warnKind(w.kind)[0];
-        pop += '<div class="pp-wrn"><div class="pp-title">' + escHtml(title) + '</div>'
-             + '<div class="pp-sub">' + (w.iso2 ? flagHtml(w.iso2) : '') + escHtml(w.station || ('Unidentified, ' + w.freq_khz + ' kHz'))
-             + ' · heard ' + w.count + '× · last ' + fmtAgo(w.last_utc) + '</div>'
-             + '<div class="pp-gist">' + escHtml(w.gist || '') + '</div>'
-             + '<span class="pp-link" data-msg="' + escHtml(w.rel) + '" data-title="' + escHtml(title) + '">Open message ›</span></div>';
+      _wrnSpots.push(spot);
+    });
+    layoutWarnings();
+  }
+
+  function warnSpotMarker(L, spot) {
+    const w0 = spot.list[0], n = spot.list.length;
+    /* Several warnings at one spot: the diamond gets a stack behind it. */
+    const html = '<div class="wrn-icon k-' + escHtml(w0.kind) + (n > 1 ? ' multi' + (n > 2 ? ' multi3' : '') : '') + '"'
+               + (n > 1 ? ' title="' + n + ' warnings here"' : '') + '>'
+               + '<span class="wrn-bg"></span>' + warnSvg(w0.kind) + '</div>';
+    let pop = '';
+    spot.list.forEach(function(w) {
+      const title = w.id + ' · ' + warnKind(w.kind)[0];
+      pop += '<div class="pp-wrn"><div class="pp-title">' + escHtml(title) + '</div>'
+           + '<div class="pp-sub">' + (w.iso2 ? flagHtml(w.iso2) : '') + escHtml(w.station || ('Unidentified, ' + w.freq_khz + ' kHz'))
+           + ' · heard ' + w.count + '× · last ' + fmtAgo(w.last_utc) + '</div>'
+           + '<div class="pp-gist">' + escHtml(w.gist || '') + '</div>'
+           + '<span class="pp-link" data-msg="' + escHtml(w.rel) + '" data-title="' + escHtml(title) + '">Open message ›</span></div>';
+    });
+    const mk = L.marker(spot.at, {
+      icon: L.divIcon({ className: '', html: html, iconSize: [26, 26], iconAnchor: [13, 13] }),
+      keyboard: false, zIndexOffset: 200
+    }).bindPopup(pop, { maxWidth: 320, maxHeight: 320 });
+    if (_stnShow.labels)
+      mk.bindTooltip(escHtml(w0.id) + '<span class="lbl-meta"> · ' + escHtml(warnKind(w0.kind)[0]) + (n > 1 ? ' ×' + n : '') + '</span>',
+                     { permanent: true, direction: 'right', offset: [14, 0], className: 'stn-lbl wrn-lbl' });
+    mk._lblRank = -1;
+    return mk;
+  }
+
+  /* Greedy grouping in screen space: the busiest spot seeds a group and
+   * takes every ungrouped spot within 30 px of it.  From zoom 10 in every
+   * spot stands alone; zoomed right out the reach widens to 40 px. */
+  function layoutWarnings() {
+    const L = window.L;
+    if (!L || !_stnMap || !_wrnLayer) return;
+    _wrnLayer.clearLayers();
+    _wrnMarkers = [];
+    if (!_wrnSpots.length) return;
+    const z = _stnMap.getZoom(), R = z < 5 ? 40 : 30;
+    const pts = _wrnSpots.map(function(sp) {
+      return { sp: sp, p: _stnMap.project(sp.at, z), used: false };
+    }).sort(function(a, b) { return b.sp.list.length - a.sp.list.length; });
+    pts.forEach(function(a) {
+      if (a.used) return;
+      a.used = true;
+      const grp = [a];
+      if (z < 10) pts.forEach(function(b) {
+        if (!b.used && Math.abs(a.p.x - b.p.x) < R && Math.abs(a.p.y - b.p.y) < R) { b.used = true; grp.push(b); }
       });
-      const mk = L.marker(spot.at, {
-        icon: L.divIcon({ className: '', html: html, iconSize: [32, 32], iconAnchor: [16, 16] }),
-        keyboard: false, zIndexOffset: 200
-      }).bindPopup(pop, { maxWidth: 320, maxHeight: 320 });
-      if (_stnShow.labels)
-        mk.bindTooltip(escHtml(w0.id) + '<span class="lbl-meta"> · ' + escHtml(warnKind(w0.kind)[0]) + (n > 1 ? ' ×' + n : '') + '</span>',
-                       { permanent: true, direction: 'right', offset: [18, 0], className: 'stn-lbl wrn-lbl' });
-      mk._lblRank = -1;
-      mk.addTo(_stnLayers);
-      _stnOverlays.push(mk);
+      if (grp.length === 1) {
+        const mk = warnSpotMarker(L, a.sp);
+        mk.addTo(_wrnLayer);
+        _wrnMarkers.push(mk);
+        return;
+      }
+      let n = 0, la = 0, lo = 0, kind = 'warning', pr = -1;
+      const ll = [];
+      grp.forEach(function(g) {
+        n += g.sp.list.length; la += g.sp.at[0]; lo += g.sp.at[1]; ll.push(g.sp.at);
+        g.sp.list.forEach(function(w) {
+          const q = WRN_PRIO[w.kind] || (w.kind === 'warning' ? 0 : 1);
+          if (q > pr) { pr = q; kind = w.kind; }
+        });
+      });
+      const d = n < 10 ? 22 : n < 100 ? 26 : 30;
+      const mk = L.marker([la / grp.length, lo / grp.length], {
+        icon: L.divIcon({ className: '', html: '<div class="wrn-clu k-' + escHtml(kind) + '" title="' + n + ' warnings: click to zoom in">' + n + '</div>',
+                          iconSize: [d, d], iconAnchor: [d / 2, d / 2] }),
+        keyboard: false, zIndexOffset: 250
+      });
+      mk.on('click', function() {
+        const b = L.latLngBounds(ll);
+        if (b.getNorthEast().equals(b.getSouthWest()) || _stnMap.getBoundsZoom(b) <= z) _stnMap.setView(b.getCenter(), Math.min(z + 2, 12));
+        else _stnMap.fitBounds(b, { padding: [40, 40], maxZoom: 12 });
+      });
+      mk.addTo(_wrnLayer);
     });
   }
 
-  /* Sea-area forecasts: a box per area with the conditions the forecast
-   * opens with.  Gale or worse anywhere in it colours the border. */
+  /* "56°02.42′N 003°21.32′W" */
+  function fmtLatLonDM(lat, lon) {
+    lon = ((lon + 540) % 360) - 180;
+    function dm(v, w, pos, neg) {
+      const a = Math.abs(v), d = Math.floor(a), m = (a - d) * 60;
+      return String(d).padStart(w, '0') + '°' + m.toFixed(2).padStart(5, '0') + '′' + (v >= 0 ? pos : neg);
+    }
+    return dm(lat, 2, 'N', 'S') + '  ' + dm(lon, 3, 'E', 'W');
+  }
+
+  /* The card's two lines from a forecast: "IRISH SEA  F10" over
+   * "<arrow> NW 7–9  Moderate–rough  Poor vis".  Words come from the
+   * server's summary ("NW 7–9 · MODERATE–ROUGH · UP TO STORM 10 · POOR VIS"),
+   * the numbers from its fields. */
+  const COMPASS = { N: 0, NNE: 22.5, NE: 45, ENE: 67.5, E: 90, ESE: 112.5, SE: 135, SSE: 157.5,
+                    S: 180, SSW: 202.5, SW: 225, WSW: 247.5, W: 270, WNW: 292.5, NW: 315, NNW: 337.5 };
+  const SEA_SHORT = { SMOOTH: 'Smooth', SLIGHT: 'Slight', MODERATE: 'Moderate', ROUGH: 'Rough',
+                      'VERY ROUGH': 'Very rough', HIGH: 'High', 'VERY HIGH': 'Very high', PHENOMENAL: 'Phenomenal' };
+  function fcAreaShort(a) {
+    return a.replace(/\bPoint\b/g, 'Pt').replace(/\bHead\b/g, 'Hd').replace(/\bCape\b/g, 'C.')
+            .replace(/\bLough\b/g, 'L.').replace(/ to /g, ' – ');
+  }
+  const GW_SVG = '<svg class="fc-gw" viewBox="0 0 12 12"><path d="M6 1l5 9.5H1z" fill="currentColor"/>'
+               + '<path d="M6 4.6v2.6" stroke="#10161f" stroke-width="1.4" stroke-linecap="round"/><circle cx="6" cy="8.7" r=".8" fill="#10161f"/></svg>';
+  function galeLine(g) {
+    const f = g.force_now > 0 ? g.force_now : g.force;
+    return (g.status === 'expected' ? 'Gale expected' : 'Gale warning') + (g.wind_dir ? ' · ' + g.wind_dir : '') + (f > 0 ? ' F' + f : '');
+  }
+  function fcCardHtml(f, peak, gale) {
+    const parts = String(f.summary || '').split(' · ');
+    let wind = '', sea = '', vis = '';
+    parts.forEach(function(p, i) {
+      if (/^UP TO /.test(p)) return;
+      if (/VIS|FOG/.test(p)) { vis = p; return; }
+      if (i === 0 && /\d/.test(p)) { wind = p; return; }
+      /* KNMI gives wave heights rather than a sea state. */
+      if (/^WAVES /.test(p)) { sea = 'Waves ' + p.slice(6).replace(/ M$/, ' m'); return; }
+      const ws = p.split('–').map(function(x) { return SEA_SHORT[x.trim()]; });
+      if (ws.length && ws.every(Boolean)) sea = ws.map(function(x, k) { return k ? x.toLowerCase() : x; }).join('–');
+    });
+    const dir = (f.wind_dir || '').split('/')[0];
+    let arrow = '';
+    if (COMPASS.hasOwnProperty(dir)) {
+      /* Drawn pointing south (a northerly) and turned to the direction the
+       * wind blows from: the arrow flies downwind, as on a weather chart. */
+      arrow = '<svg viewBox="0 0 12 12" style="transform: rotate(' + COMPASS[dir] + 'deg)"><path d="M6 1v8.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>'
+            + '<path d="M2.6 7.2L6 11l3.4-3.8z" fill="currentColor"/></svg>';
+    } else if (dir === 'CYC' || dir === 'VRB') {
+      arrow = '<svg viewBox="0 0 12 12"><path d="M9.6 4.2A4 4 0 1 0 10 7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>'
+            + '<path d="M10.6 1.6l-.4 3.6-3.4-1z" fill="currentColor"/></svg>';
+    }
+    const pk = peak >= 8 ? '<span class="fc-pk" title="Up to ' + escHtml(String(peak)) + ' in the period">F' + peak + '</span>' : '';
+    const visTxt = vis ? (/FOG/.test(vis) ? 'Fog' : /V(ERY)? POOR/.test(vis) ? 'V poor vis' : /POOR/.test(vis) ? 'Poor vis' : '') : '';
+    return '<div class="fc-l1">' + (gale ? GW_SVG : '') + '<span class="fc-area">' + escHtml(fcAreaShort(f.area)) + '</span>' + pk + '</div>'
+         + '<div class="fc-l2">' + arrow + '<span>' + escHtml(wind || '—') + '</span>'
+         + (sea ? '<span class="fc-sea">' + escHtml(sea) + '</span>' : '')
+         + (visTxt ? '<span class="fc-vis">' + escHtml(visTxt) + '</span>' : '') + '</div>';
+  }
+
+  /* Sea-area forecasts: a card per area with the conditions the forecast
+   * opens with.  Gale or worse anywhere in it colours the bar. */
   function renderMapForecasts(L) {
     if (!_stnShow.sea || !_mapData || !Array.isArray(_mapData.forecasts)) return;
-    _mapData.forecasts.forEach(function(f) {
-      if (typeof f.lat !== 'number' || typeof f.lon !== 'number' || !f.summary) return;
-      const peak = Math.max(f.force_max, f.force_peak);
+    const gales = new Map();
+    (_mapData.gales || []).forEach(function(g) { gales.set(g.area, g); });
+    /* An area with a gale warning but no forecast heard gets a card of its
+     * own: the area, then the warning. */
+    const list = _mapData.forecasts.slice();
+    gales.forEach(function(g, area) {
+      if (list.some(function(f) { return f.area === area; })) return;
+      list.push({ area: g.area, inshore: g.inshore, lat: g.lat, lon: g.lon, summary: '', wind_dir: g.wind_dir,
+                  force_max: -1, force_peak: -1, utc: g.utc, station: g.station, rel: g.rel, galeOnly: true });
+    });
+    list.forEach(function(f) {
+      if (typeof f.lat !== 'number' || typeof f.lon !== 'number' || (!f.summary && !f.galeOnly)) return;
+      const gale = gales.get(f.area) || null;
+      const peak = Math.max(f.force_max, f.force_peak, gale ? gale.force : -1);
       const sev = peak >= 10 ? ' storm' : peak >= 8 ? ' gale' : '';
       const age = (Date.now() - Date.parse(f.utc)) / 3600000;
-      const cls = 'fc-box' + sev + (f.inshore ? ' inshore' : '') + (age > 24 ? ' stale' : '');
-      const html = '<div class="' + cls + '"><div class="fc-area">' + escHtml(f.area) + '</div>'
-                 + '<div class="fc-sum">' + escHtml(f.summary) + '</div></div>';
-      const title = f.area + ' forecast';
-      const pop = '<div class="pp-title">' + escHtml(f.area) + '</div>'
-                + '<div class="pp-sub">' + (f.inshore ? 'Inshore waters' : 'Sea area') + ' · from '
-                + escHtml(f.station || 'an unidentified station') + ' · ' + fmtAgo(f.utc) + '</div>'
-                + '<div class="pp-grid"><b>Opening</b><span>' + escHtml(f.summary) + '</span></div>'
-                + '<div class="pp-body">' + escHtml(f.body || '') + '</div>'
-                + '<span class="pp-link" data-msg="' + escHtml(f.rel) + '" data-title="' + escHtml(title) + '">Open message ›</span>';
+      const cls = 'fc-box' + sev + (f.inshore ? ' inshore' : '') + (age > 24 ? ' stale' : '')
+                + (gale ? ' gw' + (gale.status === 'expected' ? ' gw-exp' : '') : '');
+      const tip = f.area + ': ' + (f.summary || '') + (gale ? (f.summary ? ' · ' : '') + galeLine(gale) : '');
+      let inner;
+      if (f.galeOnly) {
+        inner = '<div class="fc-l1">' + GW_SVG + '<span class="fc-area">' + escHtml(fcAreaShort(f.area)) + '</span>'
+              + (peak >= 8 ? '<span class="fc-pk">F' + peak + '</span>' : '') + '</div>'
+              + '<div class="fc-l2"><span>' + escHtml(gale.status === 'expected' ? 'Gale expected' : 'Gale warning') + '</span>'
+              + (gale.wind_dir ? '<span class="fc-sea">' + escHtml(gale.wind_dir) + '</span>' : '') + '</div>';
+      } else {
+        inner = fcCardHtml(f, peak, gale);
+      }
+      const html = '<div class="' + cls + '" title="' + escHtml(tip) + '">' + inner + '</div>';
+      const title = f.area + (f.galeOnly ? ' gale warning' : ' forecast');
+      let pop = '<div class="pp-title">' + escHtml(f.area) + '</div>'
+              + '<div class="pp-sub">' + (f.inshore ? 'Inshore waters' : 'Sea area')
+              + (f.galeOnly ? '' : ' · from ' + escHtml(f.station || 'an unidentified station') + ' · ' + fmtAgo(f.utc)) + '</div>'
+              + '<div class="pp-grid">' + (f.summary ? '<b>Opening</b><span>' + escHtml(f.summary) + '</span>' : '')
+              + (gale ? '<b>Gale</b><span>' + escHtml(galeLine(gale)) + '</span>' : '') + '</div>';
+      if (gale) pop += '<div class="pp-body">' + escHtml(gale.text || '') + '</div>'
+                     + '<div class="pp-sub" style="margin:4px 0 0">Gale warning from ' + escHtml(gale.station || 'an unidentified station')
+                     + ' · ' + fmtAgo(gale.utc) + ' · <span class="pp-link" data-msg="' + escHtml(gale.rel) + '" data-title="'
+                     + escHtml(f.area + ' gale warning') + '">open</span></div>';
+      if (!f.galeOnly)
+        pop += '<div class="pp-body">' + escHtml(f.body || '') + '</div>'
+             + '<span class="pp-link" data-msg="' + escHtml(f.rel) + '" data-title="' + escHtml(title) + '">Open message ›</span>';
       const mk = L.marker([f.lat, f.lon], {
         icon: L.divIcon({ className: '', html: html, iconSize: [0, 0], iconAnchor: [0, 0] }),
         keyboard: false, zIndexOffset: 20000   /* above warnings, whatever their latitude */

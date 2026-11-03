@@ -391,7 +391,7 @@ more, on top of the identification itself.
 | `GET /api/ident?rel=<path>` | The full identification of one message (station, confidence, distance, members, alternatives, facts) |
 | `GET /api/latest` | As before, each entry with an `ident` object |
 | `GET /api/stations` | Receiver location, replay progress, and every table station with distance, schedule and `heard` statistics (including `last_subject`, the subject letter of its newest message) |
-| `GET /api/mapdata[?hours=72&fc_hours=36]` | For the map: navigational and SAR warnings heard in the last `hours` that carry positions (one per warning however often it was repeated, with its kind — buoy, light, wind farm, cable, …), and the newest forecast for each sea area heard in the last `fc_hours`, reduced to wind, sea state and visibility |
+| `GET /api/mapdata[?hours=72&fc_hours=36]` | For the map: navigational and SAR warnings heard in the last `hours` that carry positions (one per warning however often it was repeated, with its kind — buoy, light, wind farm, cable, …), the newest forecast for each sea area heard in the last `fc_hours`, reduced to wind, sea state (or wave height) and visibility, and the newest gale warning per sea area in that window (`gales`: in force or expected; ceased ones are left out) |
 | `GET /flags/<iso2>.svg` | Country flag, embedded in the binary (works offline) |
 | `GET /api/analytics[?from=&to=]` | Every identified message as compact columnar JSON (time, frequency, station, confidence, distance, bearing, path, SNR, duration, failed characters) for the Metrics view; `from`/`to` are optional unix seconds |
 
@@ -409,14 +409,20 @@ finally when the message completes.
 **Stations map.** Each station is labelled with its name, letters, distance
 and what it sent last; labels that would overlap give way to busier stations
 and return as you zoom in. Two more layers, each with its own toggle: recent
-**warnings** at the positions they give, with an icon for what they concern,
-and **sea-area forecasts** — a box per area with the conditions the forecast
-opens with (e.g. `NE 4–6 · SLIGHT–MODERATE · UP TO GALE 8`), bordered amber
-for a gale and red for a storm anywhere in it. Forecasts are read from Met
-Office shipping and inshore waters bulletins and the Norwegian Meteorological
-Institute's named areas (`src/navtex_mapdata.h`); other formats are not parsed
-yet. Box positions are fixed points in each area, not area boundaries. Add
-`?map_hours=` / `?map_fc_hours=` to the page URL to widen the windows.
+**warnings** at the positions they give, with an icon for what they concern
+(nearby warnings are grouped into a count until you zoom in), **sea-area
+forecasts** — a two-line card per area with the conditions the forecast opens
+with (wind arrow, direction and force, then sea state or wave height), a bar
+coloured amber for a gale and red for a storm anywhere in it, and the worst
+force as a chip (`F9`) — and **gale warnings** in force or expected, flagged on
+the area's card. Forecasts are read from Met Office shipping and inshore
+waters bulletins, the Norwegian Meteorological Institute's named areas, Met
+Éireann's coastal waters forecast, KNMI's Dutch EEZ forecast, DWD's German
+Bight and German coastal forecasts and Oostende Radio's English forecast; gale
+warnings from the Met Office, KNMI and DWD (`src/navtex_mapdata.h` lists what
+is not read and why). Card positions are fixed points in each area, not area
+boundaries. Add `?map_hours=` / `?map_fc_hours=` to the page URL to widen the
+windows.
 
 **Maps.** The Stations tab, the Metrics view's Coverage tab and each message's
 Identification panel draw maps with Leaflet (from cdnjs) over OpenStreetMap
