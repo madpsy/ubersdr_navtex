@@ -33,6 +33,7 @@ add_test(NAME pcmv4_conformance
 #   ctest --test-dir build -R ident_facts --output-on-failure
 # -----------------------------------------------------------------------
 add_executable(ident_facts_test ident_facts_test.cpp)
+add_dependencies(ident_facts_test navtex_tables)
 target_compile_features(ident_facts_test PRIVATE cxx_std_17)
 target_include_directories(ident_facts_test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../src")
 
@@ -55,6 +56,7 @@ add_test(NAME ident_facts COMMAND ident_facts_test)
 #   ctest --test-dir build -R ident_regression --output-on-failure
 # -----------------------------------------------------------------------
 add_executable(ident_regression ident_regression.cpp)
+add_dependencies(ident_regression navtex_tables)
 target_compile_features(ident_regression PRIVATE cxx_std_11)
 set_target_properties(ident_regression PROPERTIES CXX_EXTENSIONS OFF)
 
@@ -73,6 +75,7 @@ add_test(NAME ident_regression
 #   ctest --test-dir build -R mapdata --output-on-failure
 # -----------------------------------------------------------------------
 add_executable(mapdata_test mapdata_test.cpp)
+add_dependencies(mapdata_test navtex_tables)
 target_compile_features(mapdata_test PRIVATE cxx_std_17)
 target_include_directories(mapdata_test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../src")
 

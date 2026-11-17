@@ -66,6 +66,7 @@ else()
 endif()
 
 add_executable(navtex_rx_from_ubersdr navtex_rx_from_ubersdr.cpp)
+add_dependencies(navtex_rx_from_ubersdr navtex_tables)
 
 target_include_directories(navtex_rx_from_ubersdr PRIVATE
     ${IXWS_INCLUDE_DIRS}
@@ -88,6 +89,7 @@ target_link_libraries(navtex_rx_from_ubersdr
 #   cmake --build build --target mqtt_selftest && ./build/src/mqtt_selftest
 # -----------------------------------------------------------------------
 add_executable(mqtt_selftest EXCLUDE_FROM_ALL mqtt_selftest.cpp)
+add_dependencies(mqtt_selftest navtex_tables)
 
 target_include_directories(mqtt_selftest PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}

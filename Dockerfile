@@ -14,6 +14,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         libssl-dev \
         zlib1g-dev \
         pkg-config \
+        python3 \
     && rm -rf /var/lib/apt/lists/*
 
 # Clone IXWebSocket (no system package available on Ubuntu 24.04)
@@ -24,6 +25,9 @@ COPY src/ ./src/
 # test/ carries the protocol version 4 conformance fixtures; the top-level
 # CMakeLists.txt adds it as a subdirectory, so configure needs it present.
 COPY test/ ./test/
+# tools/ holds the station-table sources; the build regenerates
+# src/navtex_stations.h and src/navtex_countries.h from them.
+COPY tools/ ./tools/
 COPY CMakeLists.txt .
 
 RUN cmake -B build \

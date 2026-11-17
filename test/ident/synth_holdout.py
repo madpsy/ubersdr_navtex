@@ -287,11 +287,15 @@ def build_world(table, a, rng):
     # Real schedule quirks the station table does not carry, keyed by station
     # (never by row number: rows move when the table is corrected).  Haifa P
     # and Odesa C used to be here too; the table now has their true slots.
-    by_key = {(s['freq'], s['id'], s['name']): s['idx'] for s in table}
-    special_sched = {by_key[k]: off for k, off in (
-        ((518000, 'Q', 'Malin Head'), -240), ((518000, 'W', 'Valentia'), -240)) if k in by_key}
-    swedish = [by_key[k] for k in ((518000, 'H', 'Bjuröklubb'), (518000, 'I', 'Grimeton'),
-                                   (518000, 'J', 'Gislövshammar')) if k in by_key]
+    # Matched on a fragment of the name, so a renamed row ("Grimeton" ->
+    # "Varberg (Grimeton)") still matches.
+    def find(freq, letter, frag):
+        return next((s['idx'] for s in table if s['freq'] == freq and s['id'] == letter
+                     and frag in s['name']), None)
+    special_sched = {i: off for i, off in (
+        (find(518000, 'Q', 'Malin Head'), -240), (find(518000, 'W', 'Valentia'), -240)) if i is not None}
+    swedish = [i for i in (find(518000, 'H', 'Bjur'), find(518000, 'I', 'Grimeton'),
+                           find(518000, 'J', 'Gisl')) if i is not None]
     for s in canon.values():
         t = Tx()
         t.truth, t.freq, t.letter, t.tab_letter = s['idx'], s['freq'], s['id'], s['id']
@@ -318,12 +322,8 @@ def build_world(table, a, rng):
                 t.tags.add('adj_shift')
                 t.nominal_s = sorted(((x + t.offset_s) % 86400) for x in t.nominal_s)
                 t.offset_s = 0
-        elif s['idx'] == 24:          # Saudanes 490 E: table 740 should be 760
-            t.nominal_s = sorted(m * 60 for m in [40, 280, 520, 760, 1000, 1240])
-            t.tags.add('sched_diff')
-        elif s['idx'] == 104:         # Sydney NS 490 J: table x:55, observed canonical J
-            t.nominal_s = [((9 * 10) + 240 * k) % 1440 * 60 for k in range(6)]
-            t.tags.add('sched_diff')
+        # (Saudanes 490 E and Sydney 490 J were special-cased here by row
+        # number; the table now carries their observed slots.)
         elif s['idx'] in swedish:
             pass
         else:

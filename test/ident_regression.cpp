@@ -98,7 +98,7 @@ static void warm_dalgety(NavtexIdentifier &id, double la, double lo, int days, i
 static void golden() {
     const double LA = 56.0403, LO = -3.3554;                  /* Dalgety Bay, IO86ha */
     const int niton = find_station(518000, 'E', "Niton");
-    const int nao = find_station(518000, 'X', "Cabo de la Nao");
+    const int nao = find_station(518000, 'X', "Cabo La Nao");
     const int serapeum = find_station(518000, 'X', "Serapeum (Ismailia)");
     CHECK(niton >= 0 && nao >= 0 && serapeum >= 0, "table rows missing");
     std::printf("golden cases:\n");
@@ -178,7 +178,7 @@ static void golden() {
      *    in 1,699 real messages, never Istanbul.  It must be named, and never Istanbul. */
     {
         NavtexIdentifier id;
-        const int oostende = find_station(490000, 'B', "Oostende");
+        const int oostende = find_station(490000, 'B', "Ostend");
         NavtexIdentResult r = id.identify(query(490000, 'B', 'A', utc(2026, 9, 4, 12, 11, 0), true, LA, LO, 10));
         show("490 B (Oostende)", r);
         CHECK(oostende >= 0, "Oostende 490 B missing from the table");

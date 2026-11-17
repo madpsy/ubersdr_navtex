@@ -1,8 +1,37 @@
 #!/usr/bin/env python3
-"""Generate src/navtex_stations.h from Wikipedia's "List of Navtex stations".
+"""Generate src/navtex_stations.h from Wikipedia's "List of Navtex stations"
+merged with the YaND decoder's station list.
 
-    curl -sf 'https://en.wikipedia.org/w/index.php?title=List_of_Navtex_stations&action=raw' > navtex.wiki
-    python3 -I tools/gen_navtex_stations.py navtex.wiki > src/navtex_stations.h
+    python3 -I tools/gen_navtex_stations.py tools/navtex_stations.wiki tools/YAND_STATIONS.TXT \\
+        [-o src/navtex_stations.h] [--report]
+
+The build runs this (src/CMakeLists.txt); -o rewrites the file only when its
+content changes, so an unchanged table does not trigger a rebuild.  --report
+prints, on stderr, every station the merge renamed, added, dropped or moved.
+
+Refresh the Wikipedia snapshot with
+    curl -sf 'https://en.wikipedia.org/w/index.php?title=List_of_Navtex_stations&action=raw' \\
+        > tools/navtex_stations.wiki
+
+How the two sources are merged (see merge()):
+  * 490 and 518 kHz: YaND decides which transmitters exist, their B1 letter,
+    site name, position, NAVAREA and callsign, and supplies the coastline
+    keywords and originator IDs.  It is newer than the Wikipedia page (India's
+    rebuilt network, Canadian sites named by transmitter rather than by MCTS
+    centre, ...).
+  * Range and active come from the Wikipedia row for the same transmitter
+    (same channel and letter within MATCH_KM), including the evidence-backed
+    CORRECTIONS below.  A transmitter YaND lists — trial services included —
+    is active unless that evidence says it is off air.
+  * Schedules come from the Wikipedia row: every YaND schedule is the plain
+    ITU letter pattern, so it carries no information of its own, while the
+    page's irregular ones are real (and corrected below where they are not).
+  * Names keep the page's accented spelling when YaND's is the same name
+    without accents.
+  * A Wikipedia station YaND does not list stays, active "not stated" — unless
+    YaND lists the same site on the same channel under another letter, which
+    is a letter change and replaces it.
+  * 424 and 4209.5 kHz: Wikipedia only; YaND does not cover them.
 
 The tables on that page do not share a column layout (some lead with Area and
 kHz columns, some have a State column, some no Range), so cells are recognised
@@ -13,8 +42,12 @@ matched against a decode anyway.
 
 Source text is CC BY-SA 4.0; the generated header carries the attribution.
 """
+import argparse
+import math
+import os
 import re
 import sys
+import unicodedata
 
 WIKI_URL = "https://en.wikipedia.org/wiki/List_of_Navtex_stations"
 
@@ -301,19 +334,189 @@ def apply_corrections(stations):
     return out
 
 
+# ------------------------------------------------------------------ YaND
+
+# Same transmitter: same channel and letter, positions within this distance.
+# The two sources' positions for one site differ by up to ~140 km (Las Palmas,
+# Buenos Aires), while the nearest distinct same-letter pair is far further.
+MATCH_KM = 150
+# A Wikipedia-only row whose site YaND lists on the same channel under another
+# letter: the letter changed.  Tighter, because sites on one channel can be
+# close (Niton E/K, Oostende T/V).
+MOVED_KM = 30
+
+# YaND's operator codes for territories and home nations -> the codes the
+# country table (tools/gen_navtex_countries.py) uses.
+YAND_COUNTRY = {
+    "ENG": "GBR", "SCT": "GBR",
+    "HOL": "NLD", "ATN": "NLD",
+    "CNR": "ESP",
+    "AZR": "POR", "MDR": "POR",
+    "RSE": "RUS",
+    "SAR": "ITA",
+    "SVB": "NOR",
+    "GRL": "DNK",
+    "PTR": "USA",
+    "RYI": "JPN",
+    "ANI": "IND",
+}
+
+TRIAL_RE = re.compile(r"\s*\{trial\}\s*", re.I)
+
+
+def great_circle_km(a, b):
+    la1, lo1, la2, lo2 = map(math.radians, (a["lat"], a["lon"], b["lat"], b["lon"]))
+    c = (math.sin(la1) * math.sin(la2) +
+         math.cos(la1) * math.cos(la2) * math.cos(lo1 - lo2))
+    return 6371.0 * math.acos(max(-1.0, min(1.0, c)))
+
+
+def off_air(s):
+    """active is True/False from the page, 1/0 from CORRECTIONS, None if unstated."""
+    return s["active"] is not None and not s["active"]
+
+
+# Letters NFKD does not decompose into a base letter plus an accent.
+FOLD_EXTRA = str.maketrans({"ø": "o", "Ø": "O", "æ": "ae", "Æ": "AE", "ı": "i",
+                            "ł": "l", "Ł": "L", "đ": "d", "Đ": "D", "ß": "ss"})
+
+
+def fold(s):
+    """Lower case, accents and punctuation removed: for comparing names."""
+    s = unicodedata.normalize("NFKD", s.translate(FOLD_EXTRA))
+    s = "".join(ch for ch in s if not unicodedata.combining(ch))
+    return re.sub(r"[^a-z0-9]+", " ", s.lower()).strip()
+
+
+def split_list(s):
+    return [x.strip() for x in s.split(",") if x.strip()]
+
+
+def parse_yand(path):
+    """AREA#kHz#B1#CALL#NAME#CODE#COUNTRY#LAT#LON#HH:MM x6#KEYWORDS#ORIGINATORS#"""
+    rows = open(path, encoding="ascii").read().splitlines()
+    if not rows or not rows[0].startswith("VERSION"):
+        sys.exit(f"{path}: not a YaND station list (no VERSION line)")
+    out = []
+    for n, ln in enumerate(rows[1:], 2):
+        if not ln.strip():
+            continue
+        p = ln.split("#")
+        if len(p) < 16:
+            sys.exit(f"{path}:{n}: {len(p)} fields")
+        times = [t for t in p[9:15] if t]
+        if not all(re.fullmatch(r"\d\d:\d\d", t) for t in times):
+            sys.exit(f"{path}:{n}: bad schedule {times}")
+        name = p[4].strip()
+        trial = bool(TRIAL_RE.search(name))
+        out.append(dict(
+            area=int(p[0]), freq=float(p[1]), id=p[2], call=p[3].strip("_ "),
+            name=TRIAL_RE.sub(" ", name).strip(), trial=trial,
+            country=YAND_COUNTRY.get(p[5], p[5]),
+            lat=float(p[7]), lon=float(p[8]),
+            minutes=sorted(int(t[:2]) * 60 + int(t[3:]) for t in times),
+            keywords=split_list(p[15]),
+            originators=split_list(p[16]) if len(p) > 16 else [],
+        ))
+    return out
+
+
+def merged_name(wiki_name, yand_name):
+    """YaND's name, in the page's spelling where it is the same name."""
+    fw, fy = fold(wiki_name), fold(yand_name)
+    if fw == fy:
+        return wiki_name
+    # "São Miguel" + "Sao Miguel (CENCOMARACORES)" -> "São Miguel (CENCOMARACORES)"
+    # "Jeløy" + "Jeloya" -> "Jeløya"
+    if fy.startswith(fw) and fold(yand_name[:len(wiki_name)]) == fw:
+        return wiki_name + yand_name[len(wiki_name):]
+    return yand_name
+
+
+def merge(wiki, yand, report):
+    """See the module docstring.  Returns the merged list; logs to report()."""
+    mf = (490.0, 518.0)
+    keep = [s for s in wiki if s["freq"] not in mf]
+    wmf = [s for s in wiki if s["freq"] in mf]
+
+    # Pair each YaND row with the nearest unclaimed Wikipedia row on the same
+    # channel and letter, closest pairs first.
+    pairs = sorted((great_circle_km(w, y), wi, yi)
+                   for wi, w in enumerate(wmf) for yi, y in enumerate(yand)
+                   if w["freq"] == y["freq"] and w["id"] == y["id"])
+    w_of, y_of = {}, {}
+    for d, wi, yi in pairs:
+        if d <= MATCH_KM and wi not in y_of and yi not in w_of:
+            w_of[yi], y_of[wi] = wi, yi
+
+    out = []
+    for yi, y in enumerate(yand):
+        s = dict(freq=y["freq"], id=y["id"], name=y["name"], country=y["country"],
+                 area=y["area"], lat=y["lat"], lon=y["lon"], call=y["call"],
+                 keywords=y["keywords"], originators=y["originators"],
+                 minutes=y["minutes"], range_nm=0, active=True)
+        tag = " (trial)" if y["trial"] else ""
+        wi = w_of.get(yi)
+        if wi is None:
+            report(f"  added    {y['freq']:g} {y['id']}  {y['name']}{tag}")
+        else:
+            w = wmf[wi]
+            s["name"] = merged_name(w["name"], y["name"])
+            s["range_nm"] = w["range_nm"]
+            if off_air(w):
+                s["active"] = False
+            if w["minutes"]:
+                s["minutes"] = w["minutes"]
+                if w["minutes"] != y["minutes"]:
+                    report(f"  schedule {y['freq']:g} {y['id']}  {s['name']}: keeping "
+                           f"{fmt_mins(w['minutes'])} over YaND's {fmt_mins(y['minutes'])}")
+            if s["name"] != w["name"]:
+                report(f"  renamed  {y['freq']:g} {y['id']}  {w['name']} -> {s['name']}{tag}")
+            d = great_circle_km(w, y)
+            if d > 20:
+                report(f"  moved    {y['freq']:g} {y['id']}  {s['name']}: {d:.0f} km")
+        out.append(s)
+
+    for wi, w in enumerate(wmf):
+        if wi in y_of:
+            continue
+        moved = [y for y in yand if y["freq"] == w["freq"] and great_circle_km(w, y) <= MOVED_KM]
+        if moved:
+            report(f"  letter   {w['freq']:g} {w['id']} -> {moved[0]['id']}  {w['name']} "
+                   f"(YaND: {moved[0]['name']}); old row dropped")
+            continue
+        s = dict(w, call="", keywords=[], originators=[])
+        s["active"] = False if off_air(w) else None
+        report(f"  kept     {w['freq']:g} {w['id']}  {w['name']}: not in YaND, active "
+               + ("no" if off_air(w) else "not stated"))
+        out.append(s)
+
+    for s in keep:
+        out.append(dict(s, call="", keywords=[], originators=[]))
+    out.sort(key=lambda s: (s["area"], -s["freq"], s["id"], s["name"]))
+    return out
+
+
+def fmt_mins(m):
+    return "/".join(f"{x // 60:02d}{x % 60:02d}" for x in m[:2]) + ("/..." if len(m) > 2 else "")
+
+
 def c_str(s):
     return '"' + s.replace("\\", "\\\\").replace('"', '\\"') + '"'
 
 
 def emit(stations, out):
     out.write(f"""/* GENERATED by tools/gen_navtex_stations.py — do not edit by hand.
+ * The build regenerates it from tools/navtex_stations.wiki and
+ * tools/YAND_STATIONS.TXT; change those or the generator instead.
  *
- * NAVTEX transmitter table, from Wikipedia "List of Navtex stations"
- * ({WIKI_URL}), licensed CC BY-SA 4.0.
+ * NAVTEX transmitter table: Wikipedia "List of Navtex stations"
+ * ({WIKI_URL}), licensed CC BY-SA 4.0, merged with the station list of the
+ * YaND decoder.
  * {len(stations)} stations.
  *
  * minutes: scheduled transmission starts, minutes after 00:00 UTC.
- * active:  1 yes, 0 no, -1 not stated on the source page.
+ * active:  1 yes, 0 no, -1 not stated by either source.
  */
 #pragma once
 
@@ -342,14 +545,75 @@ static const NavtexStation NAVTEX_STATIONS[] = {{
             ", ".join(str(m) for m in mins)))
     out.write("};\n\nstatic const int NAVTEX_STATION_COUNT =\n"
               "    (int)(sizeof(NAVTEX_STATIONS) / sizeof(NAVTEX_STATIONS[0]));\n")
+    out.write("""
+/* Parallel to NAVTEX_STATIONS (same index), from YaND; empty where YaND does
+ * not list the station.  keywords: place and service names that appear in the
+ * station's message text; originators: how the station signs its messages.
+ * Both comma separated. */
+struct NavtexStationText {
+    const char *callsign;
+    const char *keywords;
+    const char *originators;
+};
+
+static const NavtexStationText NAVTEX_STATION_TEXT[] = {
+""")
+    for s in stations:
+        out.write("    {{ {}, {}, {} }},\n".format(
+            c_str(s.get("call", "")), c_str(",".join(s.get("keywords", []))),
+            c_str(",".join(s.get("originators", [])))))
+    out.write("};\n\nstatic_assert(sizeof(NAVTEX_STATION_TEXT) / sizeof(NAVTEX_STATION_TEXT[0]) ==\n"
+              "              sizeof(NAVTEX_STATIONS) / sizeof(NAVTEX_STATIONS[0]),\n"
+              "              \"NAVTEX_STATION_TEXT must parallel NAVTEX_STATIONS\");\n")
+
+
+def write_if_changed(path, text):
+    try:
+        if open(path, encoding="utf-8").read() == text:
+            return
+    except OSError:
+        pass
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        f.write(text)
+    os.replace(tmp, path)
 
 
 def main():
-    text = open(sys.argv[1], encoding="utf-8").read()
-    stations = apply_corrections(parse(text))
-    if len(stations) < 100:
-        sys.exit(f"only {len(stations)} stations parsed — page layout changed?")
-    emit(stations, sys.stdout)
+    ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    ap.add_argument("wiki", help="tools/navtex_stations.wiki")
+    ap.add_argument("yand", help="tools/YAND_STATIONS.TXT")
+    ap.add_argument("-o", "--out", help="write here (only if changed) instead of stdout")
+    ap.add_argument("--report", action="store_true", help="list merge decisions on stderr")
+    a = ap.parse_args()
+
+    wiki = apply_corrections(parse(open(a.wiki, encoding="utf-8").read()))
+    if len(wiki) < 100:
+        sys.exit(f"only {len(wiki)} stations parsed — page layout changed?")
+    yand = parse_yand(a.yand)
+    if len(yand) < 100:
+        sys.exit(f"only {len(yand)} YaND stations parsed")
+
+    log = []
+    stations = merge(wiki, yand, log.append)
+    if a.report:
+        order = ["added", "renamed", "letter", "kept", "moved", "schedule"]
+        log.sort(key=lambda l: (order.index(l.split()[0]), l))
+        sys.stderr.write(f"{len(wiki)} Wikipedia + {len(yand)} YaND -> {len(stations)} stations\n")
+        sys.stderr.write("\n".join(log) + "\n")
+
+    keys = [(s["freq"], s["id"], s["name"]) for s in stations]
+    dup = {k for k in keys if keys.count(k) > 1}
+    if dup:
+        sys.exit(f"duplicate station keys (channel, letter, name): {sorted(dup)}")
+
+    import io
+    buf = io.StringIO()
+    emit(stations, buf)
+    if a.out:
+        write_if_changed(a.out, buf.getvalue())
+    else:
+        sys.stdout.write(buf.getvalue())
 
 
 if __name__ == "__main__":
